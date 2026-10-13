@@ -55,3 +55,9 @@ Ao conectar o repositório do GitHub ao Render, novas alterações na branch vin
 ## Observação
 
 Todos os nomes, partidos, acontecimentos, regiões e cenários políticos do jogo são fictícios.
+
+
+## Atualização v2
+Partidos brasileiros e nomes reais como referências em cenário alternativo; pesquisas e acontecimentos inventados. Nova aba Integridade com ofertas ilícitas de personagens fictícios, auditoria, investigação e sanções simuladas. **Não é relato de fatos contra pessoa ou partido real.**
+
+Para publicar, envie os arquivos `index.html`, `app.js` e `styles.css` à raiz do repositório no GitHub (sobrescrevendo os existentes). No Render use Publish Directory `.`.

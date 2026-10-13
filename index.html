@@ -52,8 +52,25 @@
           </label>
 
           <label>
-            <span>Nome do partido</span>
-            <input id="partyName" type="text" value="Aliança Cívica" maxlength="28" />
+            <span>Partido brasileiro</span>
+            <select id="partyName">
+              <option value="PT">PT — Partido dos Trabalhadores</option>
+              <option value="PL">PL — Partido Liberal</option>
+              <option value="PSD">PSD — Partido Social Democrático</option>
+              <option value="MDB">MDB — Movimento Democrático Brasileiro</option>
+              <option value="PSB">PSB — Partido Socialista Brasileiro</option>
+              <option value="PSDB">PSDB — Partido da Social Democracia Brasileira</option>
+              <option value="PDT">PDT — Partido Democrático Trabalhista</option>
+              <option value="REPUBLICANOS">Republicanos</option>
+              <option value="UNIÃO">União Brasil</option>
+              <option value="PP">Progressistas (PP)</option>
+              <option value="PSOL">PSOL — Partido Socialismo e Liberdade</option>
+              <option value="NOVO">Novo</option>
+              <option value="PODE">Podemos</option>
+              <option value="MISSÃO">Missão</option>
+              <option value="REDE">Rede Sustentabilidade</option>
+              <option value="PV">Partido Verde</option>
+            </select>
           </label>
         </div>
 
@@ -63,7 +80,7 @@
         </div>
 
         <div class="setup-note">
-          Jogo fictício. Partidos, candidatos, regiões e acontecimentos são inventados.
+          Simulação alternativa: nomes de partidos e políticos reais; pesquisas, atos de campanha, corrupção e resultados inteiramente fictícios. Nenhuma acusação a pessoas ou partidos reais.
         </div>
       </div>
     </section>
@@ -85,6 +102,7 @@
           <button class="nav-item" data-view="proposals">Propostas</button>
           <button class="nav-item" data-view="media">Mídia</button>
           <button class="nav-item" data-view="coalitions">Alianças</button>
+          <button class="nav-item" data-view="integrity">Integridade</button>
         </nav>
 
         <div class="sidebar-bottom">
@@ -240,6 +258,10 @@
             <div id="mediaContent"></div>
           </section>
 
+          <section id="integrityView" class="view">
+            <div class="section-lead"><div><p class="eyebrow">SIMULAÇÃO FICTÍCIA</p><h3>Integridade e corrupção</h3></div><p>Decisões sobre ofertas ilícitas de personagens fictícios, auditorias, investigações e consequências. Não representa fatos sobre pessoas ou partidos reais.</p></div>
+            <div id="integrityContent"></div>
+          </section>
           <section id="coalitionsView" class="view">
             <div class="section-lead">
               <div>

@@ -12,10 +12,12 @@
     { id: "sul", name: "Sul Agrícola", voters: 29, issue: "Custo de vida", support: 20, undecided: 19, organization: 17, media: 0 }
   ];
 
+  // Políticos reais inseridos apenas como personagens de eleição contrafactual.
+  // Pesquisas, comportamentos e resultados do jogo não refletem dados reais.
   const opponents = [
-    { id: "helena", name: "Helena Vasconcelos", party: "União Nacional", poll: 30.5 },
-    { id: "ricardo", name: "Ricardo Nunes", party: "Frente Popular", poll: 26.2 },
-    { id: "sofia", name: "Sofia Amaral", party: "Movimento Futuro", poll: 12.4 }
+    { id: "lula", name: "Luiz Inácio Lula da Silva", party: "PT", poll: 30.5 },
+    { id: "flavio", name: "Flávio Bolsonaro", party: "PL", poll: 26.2 },
+    { id: "caiado", name: "Ronaldo Caiado", party: "PSD", poll: 12.4 }
   ];
 
   const ideologyEffects = {
@@ -268,13 +270,17 @@
       digital: 20,
       debate: 35,
       scandal: 6,
+      integrity: 65,
+      corruptionRisk: 0,
+      investigation: 0,
+      illicitFunds: 0,
       ai: modifiers.ai,
       regions: baseRegions.map(r => ({...r, support: r.support + modifiers.support})),
       opponents: opponents.map(o => ({...o})),
       proposals: {},
       coalitions: coalitionDefs.map(c => ({...c, secured: false})),
       news: [
-        { title: "Campanha oficialmente lançada", text: "A candidatura inicia a disputa nacional com 24 semanas até a votação." },
+        { title: "Campanha oficialmente lançada", text: "Cenário alternativo: ações, pesquisas e acontecimentos políticos são simulados e não refletem fatos reais." },
         { title: "Eleitorado fragmentado", text: "Pesquisas mostram corrida aberta, com parcela relevante de indecisos." }
       ],
       turns: 0,
@@ -336,6 +342,9 @@
     state.ground = clamp(state.ground, 0, 100);
     state.digital = clamp(state.digital, 0, 100);
     state.debate = clamp(state.debate, 0, 100);
+    state.integrity = clamp(state.integrity ?? 65, 0, 100);
+    state.corruptionRisk = clamp(state.corruptionRisk ?? 0, 0, 100);
+    state.investigation = clamp(state.investigation ?? 0, 0, 100);
     state.funds = Math.max(0, state.funds);
     state.regions.forEach(r => {
       r.support = clamp(r.support, 4, 62);
@@ -366,6 +375,7 @@
     });
 
     state.funds += 0.8 + state.ground / 160 + Math.max(0, state.reputation - 50) / 90;
+    resolveIntegrityTurn();
     state.media *= .82;
     state.week--;
     state.turns++;
@@ -520,6 +530,7 @@
     renderProposals();
     renderMedia();
     renderCoalitions();
+    renderIntegrity();
   }
 
   function renderPolls(nat) {
@@ -652,6 +663,65 @@
       </div>`).join("");
   }
 
+
+  // Corrupção é mecânica de jogo inteiramente ficcional: NÃO descreve os partidos reais.
+  function integrityAction(kind) {
+    if (!state || state.finished) return;
+    if (state.energy < 1) return showToast("Sem pontos de agenda");
+    if (kind === "audit" && state.funds < .8) return showToast("Caixa insuficiente");
+    if (kind === "reject") {
+      state.energy--;
+      state.integrity += 10; state.corruptionRisk -= 6; state.reputation += 1.3;
+      addNews("Campanha rejeita oferta irregular", "Um operador fictício ofereceu verba não declarada; a campanha recusou e registrou a tentativa.");
+    } else if (kind === "audit") {
+      state.energy--; state.funds -= .8;
+      state.integrity += 12; state.corruptionRisk -= 14;
+      state.investigation = Math.max(0, state.investigation - 8);
+      addNews("Auditoria fictícia reforçada", "Controles internos ampliam a transparência das despesas da campanha.");
+    } else if (kind === "illegal") {
+      if (!confirm("Decisão fictícia: aceitar recursos ilícitos simulados? Isso pode levar a investigação, sanções e perda eleitoral.")) return;
+      state.energy--;
+      state.funds += 4.5; state.illicitFunds = (state.illicitFunds || 0) + 4.5;
+      state.corruptionRisk += 34; state.integrity -= 27; state.reputation -= 3;
+      addNews("Operação irregular simulada", "Personagens fictícios ocultaram movimentações financeiras; risco de investigação aumentou.");
+    }
+    normalize(); renderAll();
+  }
+
+  function resolveIntegrityTurn() {
+    if (!state || (state.corruptionRisk || 0) < 3) return;
+    const chance = Math.min(.85, state.corruptionRisk / 135);
+    if (Math.random() < chance) {
+      state.investigation = clamp((state.investigation || 0) + rnd(12, 27), 0, 100);
+      state.media -= rnd(2, 6); state.reputation -= rnd(2, 6);
+      shiftAll(state, -rnd(.4, 1.4));
+      addNews("Investigação fictícia na campanha", "Órgãos de controle simulados apuram movimentações irregulares de personagens inventados. Há perda de apoio eleitoral.");
+      if (state.investigation > 72) {
+        state.funds = Math.max(0, state.funds - 3); shiftAll(state, -1.8);
+        addNews("Sanção eleitoral simulada", "Processo fictício bloqueia recursos e reduz apoio eleitoral.");
+      }
+    }
+    state.corruptionRisk = Math.max(0, state.corruptionRisk - 1.2);
+  }
+
+  function renderIntegrity() {
+    const el = $("integrityContent");
+    if (!el) return;
+    const risk = state.corruptionRisk || 0, trust = state.integrity ?? 65, investigation = state.investigation || 0;
+    el.innerHTML = `
+      <div class="metric-grid" style="margin-top:0">
+        <div class="metric-card"><span>Integridade (simulada)</span><strong>${Math.round(trust)}/100</strong><small>transparência da campanha</small></div>
+        <div class="metric-card"><span>Risco de corrupção</span><strong class="${risk>30?'negative':''}">${Math.round(risk)}/100</strong><small>risco de detecção</small></div>
+        <div class="metric-card"><span>Investigação fictícia</span><strong>${Math.round(investigation)}/100</strong><small>consequências eleitorais</small></div>
+        <div class="metric-card"><span>Recursos ilícitos simulados</span><strong>${money(state.illicitFunds||0)}</strong><small>não representa fato real</small></div>
+      </div>
+      <div class="action-grid" style="margin-top:16px">
+        <div class="action-card"><div><h4>Rejeitar oferta irregular</h4><p>Um personagem fictício oferece verba não declarada. Recuse e registre a tentativa.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">aumenta integridade</span></div></div><button class="btn btn-primary" ${state.energy<1||state.finished?'disabled':''} onclick="window.__game.integrityAction('reject')">Recusar</button></div>
+        <div class="action-card"><div><h4>Auditar as contas</h4><p>Contrate fiscalização interna fictícia e reduza exposição a irregularidades.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">R$ 0,8 mi</span></div></div><button class="btn btn-primary" ${state.energy<1||state.funds<.8||state.finished?'disabled':''} onclick="window.__game.integrityAction('audit')">Auditar</button></div>
+        <div class="action-card"><div><h4>Aceitar caixa dois (fictício)</h4><p>Receba recursos simulados não declarados: caixa aumenta, mas há risco de investigação, sanções e perda de votos. Não representa acusação contra pessoa ou partido real.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">risco alto</span></div></div><button class="btn btn-danger" ${state.energy<1||state.finished?'disabled':''} onclick="window.__game.integrityAction('illegal')">Aceitar</button></div>
+      </div>`;
+  }
+
   function ideologyLabel(v) {
     return {
       centro: "Centro pragmático",
@@ -710,7 +780,8 @@
       agenda: "Agenda",
       proposals: "Propostas",
       media: "Mídia",
-      coalitions: "Alianças"
+      coalitions: "Alianças",
+      integrity: "Integridade"
     };
     $("pageTitle").textContent = labels[view];
   }
@@ -729,6 +800,7 @@
     },
     chooseProposal,
     negotiateCoalition,
-    regionalVisit
+    regionalVisit,
+    integrityAction
   };
 })();
