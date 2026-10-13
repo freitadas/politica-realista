@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101624" />
+  <meta name="description" content="Simulador político eleitoral realista em um país fictício." />
+  <title>Mandato — Simulador Político</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="setup" class="setup-screen">
+      <div class="setup-card">
+        <div class="brand-lockup">
+          <div class="brand-mark">M</div>
+          <div>
+            <p class="eyebrow">SIMULADOR POLÍTICO</p>
+            <h1>Mandato</h1>
+          </div>
+        </div>
+
+        <p class="setup-intro">
+          Dispute a presidência da fictícia República de Aurélia. Gerencie campanha,
+          orçamento, imprensa, alianças, crises e propostas durante 24 semanas.
+        </p>
+
+        <div class="setup-grid">
+          <label>
+            <span>Nome do candidato</span>
+            <input id="candidateName" type="text" value="Alex Moreira" maxlength="28" />
+          </label>
+
+          <label>
+            <span>Linha política</span>
+            <select id="ideology">
+              <option value="centro">Centro pragmático</option>
+              <option value="social">Social-desenvolvimentista</option>
+              <option value="liberal">Liberal reformista</option>
+              <option value="verde">Verde progressista</option>
+              <option value="conservador">Conservador institucional</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Dificuldade</span>
+            <select id="difficulty">
+              <option value="normal">Normal</option>
+              <option value="hard">Difícil</option>
+              <option value="expert">Especialista</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Nome do partido</span>
+            <input id="partyName" type="text" value="Aliança Cívica" maxlength="28" />
+          </label>
+        </div>
+
+        <div class="setup-actions">
+          <button id="startGame" class="btn btn-primary">Começar campanha</button>
+          <button id="loadGameSetup" class="btn btn-ghost">Carregar salvamento</button>
+        </div>
+
+        <div class="setup-note">
+          Jogo fictício. Partidos, candidatos, regiões e acontecimentos são inventados.
+        </div>
+      </div>
+    </section>
+
+    <section id="game" class="game-shell hidden">
+      <aside class="sidebar">
+        <div class="brand-small">
+          <div class="brand-mark">M</div>
+          <div>
+            <strong>Mandato</strong>
+            <span>Campanha presidencial</span>
+          </div>
+        </div>
+
+        <nav id="nav">
+          <button class="nav-item active" data-view="overview">Visão geral</button>
+          <button class="nav-item" data-view="regions">Regiões</button>
+          <button class="nav-item" data-view="agenda">Agenda</button>
+          <button class="nav-item" data-view="proposals">Propostas</button>
+          <button class="nav-item" data-view="media">Mídia</button>
+          <button class="nav-item" data-view="coalitions">Alianças</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <button id="saveGame" class="btn btn-ghost full">Salvar jogo</button>
+          <button id="newGame" class="btn btn-danger full">Nova campanha</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="campaignPhase">CAMPANHA NACIONAL</p>
+            <h2 id="pageTitle">Visão geral</h2>
+          </div>
+          <div class="top-meta">
+            <div class="meta-box">
+              <span>Semana</span>
+              <strong id="weekDisplay">24</strong>
+            </div>
+            <div class="meta-box">
+              <span>Ações</span>
+              <strong id="energyDisplay">3/3</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <section id="overviewView" class="view active">
+            <div class="hero-card">
+              <div>
+                <p class="eyebrow">CANDIDATURA</p>
+                <h3 id="candidateTitle"></h3>
+                <p id="candidateSubtitle"></p>
+              </div>
+              <div class="hero-poll">
+                <span>Intenção nacional</span>
+                <strong id="nationalPoll">0%</strong>
+              </div>
+            </div>
+
+            <div class="metric-grid">
+              <div class="metric-card">
+                <span>Caixa de campanha</span>
+                <strong id="fundsMetric">R$ 0 mi</strong>
+                <small id="fundsDelta">recursos disponíveis</small>
+              </div>
+              <div class="metric-card">
+                <span>Reputação</span>
+                <strong id="reputationMetric">0</strong>
+                <small>credibilidade pública</small>
+              </div>
+              <div class="metric-card">
+                <span>Imprensa</span>
+                <strong id="mediaMetric">0</strong>
+                <small>saldo de cobertura</small>
+              </div>
+              <div class="metric-card">
+                <span>Rede de campanha</span>
+                <strong id="groundMetric">0</strong>
+                <small>capilaridade territorial</small>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">PESQUISA</p>
+                    <h3>Corrida presidencial</h3>
+                  </div>
+                  <span class="badge" id="trendBadge">estável</span>
+                </div>
+                <div id="pollBars" class="poll-bars"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">CENÁRIO</p>
+                    <h3>Assuntos dominantes</h3>
+                  </div>
+                </div>
+                <div id="issueList" class="issue-list"></div>
+              </div>
+            </div>
+
+            <div class="two-col lower">
+              <div class="panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">NOTICIÁRIO</p>
+                    <h3>Últimos acontecimentos</h3>
+                  </div>
+                </div>
+                <div id="newsFeed" class="news-feed"></div>
+              </div>
+
+              <div class="panel next-turn-panel">
+                <div>
+                  <p class="eyebrow">RODADA</p>
+                  <h3>Encerrar a semana</h3>
+                  <p>
+                    Ao avançar, pesquisas são atualizadas, os adversários agem e um novo
+                    evento político pode ocorrer.
+                  </p>
+                </div>
+                <button id="nextTurn" class="btn btn-primary full">Avançar uma semana</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="regionsView" class="view">
+            <div class="section-lead">
+              <div>
+                <p class="eyebrow">TERRITÓRIO</p>
+                <h3>Mapa eleitoral</h3>
+              </div>
+              <p>Concentre recursos onde o eleitorado é numeroso ou a disputa está apertada.</p>
+            </div>
+            <div id="regionGrid" class="region-grid"></div>
+          </section>
+
+          <section id="agendaView" class="view">
+            <div class="section-lead">
+              <div>
+                <p class="eyebrow">ESTRATÉGIA</p>
+                <h3>Agenda da semana</h3>
+              </div>
+              <p>Cada ação consome 1 ponto de agenda. Algumas também exigem recursos.</p>
+            </div>
+            <div id="actionGrid" class="action-grid"></div>
+          </section>
+
+          <section id="proposalsView" class="view">
+            <div class="section-lead">
+              <div>
+                <p class="eyebrow">PROGRAMA</p>
+                <h3>Propostas prioritárias</h3>
+              </div>
+              <p>Assuma posições. Cada decisão altera apoio por região e segmentos sociais.</p>
+            </div>
+            <div id="proposalGrid" class="proposal-grid"></div>
+          </section>
+
+          <section id="mediaView" class="view">
+            <div class="section-lead">
+              <div>
+                <p class="eyebrow">COMUNICAÇÃO</p>
+                <h3>Ambiente de mídia</h3>
+              </div>
+              <p>Equilibre visibilidade, risco e capacidade de resposta.</p>
+            </div>
+            <div id="mediaContent"></div>
+          </section>
+
+          <section id="coalitionsView" class="view">
+            <div class="section-lead">
+              <div>
+                <p class="eyebrow">GOVERNABILIDADE</p>
+                <h3>Alianças políticas</h3>
+              </div>
+              <p>Negocie apoios sem destruir sua coerência programática.</p>
+            </div>
+            <div id="coalitionGrid" class="coalition-grid"></div>
+          </section>
+        </div>
+      </main>
+    </section>
+
+    <div id="modalBackdrop" class="modal-backdrop hidden">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-topline"></div>
+        <p class="eyebrow">EVENTO POLÍTICO</p>
+        <h3 id="modalTitle"></h3>
+        <p id="modalText" class="modal-text"></p>
+        <div id="modalChoices" class="modal-choices"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
