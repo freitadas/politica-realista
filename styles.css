@@ -421,3 +421,21 @@ nav { display: grid; gap: 8px; margin-top: 34px; }
 
 .save-status { text-align:right; font-size:11px; color:var(--muted); margin:0 0 12px; }
 @media(max-width:560px) { .top-meta #exportGameTop { display:none; } .top-meta #saveGameTop { padding:9px; } }
+
+
+/* V6 · carreiras sucessivas, progressão e debates interativos */
+.career-current { background: linear-gradient(120deg, rgba(82,214,164,.08),transparent 40%), var(--panel); }
+.career-current h3 { margin:8px 0; }
+.career-current p:not(.eyebrow), .debate-live p { line-height:1.6; color:var(--muted); }
+.career-history { display:grid; gap:10px; margin-top:16px; }
+.career-record { padding:14px; border-radius:12px; border:1px solid var(--line); background:#131b2d; display:flex; gap:12px; justify-content:space-between; align-items:center; }
+.career-record strong { font-size:13px; display:block; }
+.career-record small { display:block; font-size:11px; margin-top:5px; color:var(--muted); }
+.career-meta { min-width:150px; text-align:right; }
+.debate-live { background:linear-gradient(135deg,rgba(103,169,255,.12),transparent 50%),var(--panel); }
+.debate-live h3 { font-size:23px; line-height:1.4; margin:14px 0; }
+.debate-step { color:var(--accent); font-weight:700; font-size:13px; margin-top:14px; }
+.debate-answers { display:grid; gap:11px; margin-top:18px; }
+.debate-answers .choice-btn:hover { border-color:var(--accent-2); transform:translateY(-1px); }
+.debate-score { margin:18px 0 0; }
+@media(max-width:560px) { .career-record { align-items:start; flex-direction:column; } .career-meta { text-align:left; } }
