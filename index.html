@@ -21,10 +21,22 @@
         </div>
 
         <p class="setup-intro">
-          Dispute a presidência da fictícia República de Aurélia. Gerencie campanha, segundo turno e governo: 27 unidades federativas, Congresso,
-          economia, investigações fictícias e políticas públicas.
+          Construa uma carreira política no Brasil alternativo: escolha cargo, estado e município. Dispute eleições e administre seu mandato em uma simulação fictícia.
         </p>
 
+        <div class="setup-grid" style="margin-bottom:16px">
+          <label><span>Cargo pretendido</span><select id="officeChoice">
+            <option value="presidente">Presidente da República</option>
+            <option value="governador">Governador</option>
+            <option value="senador">Senador</option>
+            <option value="deputado_federal">Deputado federal</option>
+            <option value="deputado_estadual">Deputado estadual / distrital</option>
+            <option value="prefeito">Prefeito</option>
+            <option value="vereador">Vereador</option>
+          </select></label>
+          <label id="stateSelectLabel"><span>Estado de candidatura</span><select id="stateChoice"></select></label>
+          <label id="citySelectLabel" class="hidden"><span>Município da eleição</span><input id="cityChoice" maxlength="60" placeholder="Ex.: Vitória" value="Vitória" /></label>
+        </div>
         <div class="setup-grid">
           <label>
             <span>Nome do candidato</span>
@@ -93,7 +105,7 @@
           <div class="brand-mark">M</div>
           <div>
             <strong>Mandato</strong>
-            <span>Campanha presidencial</span>
+            <span>Carreira política</span>
           </div>
         </div>
 
@@ -105,7 +117,7 @@
           <button class="nav-item" data-view="media">Mídia</button>
           <button class="nav-item" data-view="coalitions">Alianças</button>
           <button class="nav-item" data-view="integrity">Integridade</button>
-          <button class="nav-item" data-view="government">Presidência</button>
+          <button class="nav-item" data-view="government">Mandato</button>
         </nav>
 
         <div class="sidebar-bottom">
@@ -221,7 +233,7 @@
             </div>
           </section>
 
-          <section id="governmentView" class="view"><div class="section-lead"><div><p class="eyebrow">GESTÃO PÚBLICA</p><h3>Presidência e políticas públicas</h3></div><p>Governe o país depois de vencer a eleição.</p></div><div id="governmentContent"></div></section>
+          <section id="governmentView" class="view"><div class="section-lead"><div><p class="eyebrow">GESTÃO PÚBLICA</p><h3>Mandato e políticas públicas</h3></div><p>Administre a esfera pública correspondente ao cargo conquistado.</p></div><div id="governmentContent"></div></section>
           <section id="regionsView" class="view">
             <div class="section-lead">
               <div>

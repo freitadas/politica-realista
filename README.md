@@ -24,3 +24,8 @@ Partidos e políticos têm nomes reais; pesquisas, eventos e episódios de corru
 - Inflação, desemprego, PIB, dívida, educação, saúde, segurança e aprovação fictícios.
 - Continuidade do sistema de integridade e salvamentos v3, com migração de partidas antigas de 4 regiões.
 - Simulação ficcional: números não representam dados oficiais; personagens reais não devem ser associados aos eventos de corrupção gerados pelo jogo.
+
+
+## v5 — Cargos e estados
+
+Escolha Presidente, Governador, Senador, Deputado federal, Deputado estadual/distrital, Prefeito ou Vereador. Escolha qualquer uma das 27 unidades federativas; para cargos municipais, digite o município. Campanhas nacionais usam 27 UFs; estaduais e municipais usam 5 distritos **fictícios** para dinâmica regional. Adversários locais são fictícios. Mandatos simulados: senador 96 meses; demais 48 meses. A eleição para deputado e vereador usa **limiar simplificado** e não reproduz quocientes proporcionais, votos de legenda ou regras oficiais. Cargos municipais têm segundo turno simulado, sem validação do critério real de população do município. O painel de gestão reaproveita indicadores macroeconômicos fictícios e ainda não representa competências federativas distintas com fidelidade jurídica.

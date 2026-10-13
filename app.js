@@ -35,6 +35,27 @@
     { id: "to", name: "Tocantins", uf:"TO", voters:0.9, issue:"Infraestrutura", support:21, undecided:16, organization:18, media:0 },
   ];
 
+  const officeNames = {presidente:"Presidente da República",governador:"Governador",senador:"Senador",deputado_federal:"Deputado federal",deputado_estadual:"Deputado estadual / distrital",prefeito:"Prefeito",vereador:"Vereador"};
+  const executiveOffices = new Set(["presidente","governador","prefeito"]);
+  const legislativeOffices = new Set(["senador","deputado_federal","deputado_estadual","vereador"]);
+  const citiesByState = {ES:"Vitória",SP:"São Paulo",RJ:"Rio de Janeiro",MG:"Belo Horizonte",BA:"Salvador",PR:"Curitiba",RS:"Porto Alegre",SC:"Florianópolis",DF:"Brasília",GO:"Goiânia",PE:"Recife",CE:"Fortaleza",AM:"Manaus",PA:"Belém",MA:"São Luís",PB:"João Pessoa",RN:"Natal",AL:"Maceió",SE:"Aracaju",PI:"Teresina",MT:"Cuiabá",MS:"Campo Grande",RO:"Porto Velho",RR:"Boa Vista",AP:"Macapá",AC:"Rio Branco",TO:"Palmas"};
+  const fictionalRivals = [
+    {id:"local1",name:"Marina Duarte",party:"MDB",poll:30.5},
+    {id:"local2",name:"Eduardo Campos Filho",party:"PSD",poll:26.2},
+    {id:"local3",name:"Clara Monteiro",party:"PL",poll:12.4}
+  ];
+  function selectedOffice(){return $("officeChoice").value;}
+  function selectedLocation(office=selectedOffice()){
+    if(office==="presidente")return "Brasil";
+    if(office==="prefeito"||office==="vereador")return ($("cityChoice").value.trim()||citiesByState[$("stateChoice").value]||"Município")+" / "+$("stateChoice").value;
+    return $("stateChoice").value;
+  }
+  function electionDistricts(office,uf,city){
+    if(office==="presidente")return baseRegions.map(r=>({...r}));
+    const original=baseRegions.find(r=>r.uf===uf)||baseRegions[0];
+    if(office==="prefeito"||office==="vereador")return ["Centro","Zona Norte","Zona Sul","Zona Leste","Zona Oeste"].map((zone,i)=>({...original,id:"mun"+i,name:zone+" — "+city,uf,voters:20,support:clamp(original.support+[-1,1,2,-2,0][i],8,50),organization:18+i}));
+    return ["Capital e região metropolitana","Interior urbano","Interior rural","Região norte","Região sul"].map((zone,i)=>({...original,id:"est"+i,name:zone+" — "+original.name,uf,voters:[36,22,18,12,12][i],support:clamp(original.support+[2,-1,-2,1,0][i],8,50),organization:18+i}));
+  }
   const opponents = [
     { id: "lula", name: "Luiz Inácio Lula da Silva", party: "PT", poll: 30.5 },
     { id: "flavio", name: "Flávio Bolsonaro", party: "PL", poll: 26.2 },
@@ -276,9 +297,12 @@
     const bonus = ideologyEffects[ideology];
 
     return {
-      version: 4,
+      version: 5,
       phase: "campaign",
-      office: "presidente",
+      office: selectedOffice(),
+      stateUF: $("stateChoice").value,
+      municipality: $("cityChoice").value.trim(),
+      district: selectedLocation(),
       administration: null,
       electionHistory: [],
       candidate: $("candidateName").value.trim() || "Alex Moreira",
@@ -300,8 +324,8 @@
       investigation: 0,
       illicitFunds: 0,
       ai: modifiers.ai,
-      regions: baseRegions.map(r => ({...r, support: r.support + modifiers.support})),
-      opponents: opponents.map(o => ({...o})),
+      regions: electionDistricts(selectedOffice(), $("stateChoice").value, $("cityChoice").value.trim()).map(r => ({...r, support: r.support + modifiers.support})),
+      opponents: (selectedOffice()==="presidente"? opponents: fictionalRivals).map(o => ({...o})),
       proposals: {},
       coalitions: coalitionDefs.map(c => ({...c, secured: false})),
       news: [
@@ -448,6 +472,13 @@
     state.electionHistory = state.electionHistory || [];
     state.electionHistory.push({round:1,results:estimates});
     state.week=0;
+    if (legislativeOffices.has(state.office)) {
+      // Modelo simplificado de eleição legislativa. Eleições proporcionais reais também dependem de votação partidária e quocientes.
+      const own=estimates.find(c=>c.name===state.candidate);
+      const elected=state.office==="senador" ? estimates[0].name===state.candidate : own.votes>=15;
+      return concludeElection(elected,own.votes,1);
+    }
+    if (state.office==="prefeito" && state.electorateSmall) return concludeElection(estimates[0].name===state.candidate,estimates.find(c=>c.name===state.candidate).votes,1);
     if (estimates[0].votes>50) return concludeElection(estimates[0].name === state.candidate,estimates[0].votes,1);
     const finalist=estimates.slice(0,2);
     if(!finalist.some(c=>c.name===state.candidate)) return concludeElection(false,estimates.find(c=>c.name===state.candidate).votes,1);
@@ -487,12 +518,12 @@
     state.week=0;
     if(won) {
       state.phase="government";
-      state.administration={month:1,maxMonths:48,approval:clamp(state.reputation+5,30,80),congress:46,
+      state.administration={month:1,maxMonths:(state.office==="senador"?96:48),approval:clamp(state.reputation+5,30,80),congress:46,
         inflation:5.8,unemployment:8.4,gdp:1.6,debt:74,health:48,education:49,security:45,
         budget:80,coalition:0,policies:[],history:[]};
       state.energy=3;
-      addNews("Posse presidencial fictícia",`Vitória com ${round1(percent)}% no ${round}º turno. Começa a fase de governo.`);
-      showDecision("Eleição vencida",`Você obteve ${round1(percent)}% dos votos na simulação. O mandato começa agora: governe por 48 meses.`,"Assumir presidência",()=>navTo("government"));
+      addNews("Posse fictícia",`Eleição para ${officeNames[state.office]} em ${state.district}: ${round1(percent)}% no ${round}º turno. Começa o mandato.`);
+      showDecision("Eleição vencida",`Você obteve ${round1(percent)}% dos votos na simulação e foi eleito para ${officeNames[state.office]} (${state.district}). Começa o seu mandato.`,"Assumir mandato",()=>navTo("government"));
     } else {
       state.phase="ended"; state.finished=true;
       showDecision("Derrota eleitoral",`Sua candidatura terminou com ${round1(percent)}% no ${round}º turno da eleição simulada.`,"Ver resultados",()=>navTo("overview"));
@@ -536,17 +567,17 @@
     g.budget+=7;g.congress=clamp(g.congress+rnd(-2,2),0,100);
     resolveIntegrityTurn();g.history.push({month:g.month,approval:round1(g.approval),inflation:round1(g.inflation)});
     if(g.month>=g.maxMonths){state.finished=true;state.phase="ended";showDecision("Fim do mandato",`Aprovação final de ${round1(g.approval)}%. Você aprovou ${g.policies.length} projetos. O resultado de sua gestão foi registrado no histórico.`,"Ver balanço",()=>navTo("government"));}
-    else {g.month++;state.energy=3;addNews("Novo mês de governo",`Mês ${g.month} de 48: inflação ${round1(g.inflation)}%, desemprego ${round1(g.unemployment)}%.`);}
+    else {g.month++;state.energy=3;addNews("Novo mês de governo",`Mês ${g.month} de ${g.maxMonths}: inflação ${round1(g.inflation)}%, desemprego ${round1(g.unemployment)}%.`);}
     renderAll();
   }
   function renderGovernment(){
     const el=$("governmentContent");if(!el)return;
     const g=state.administration;
-    if(!g){el.innerHTML='<div class="panel">Vença a eleição para assumir a presidência. Após a posse você poderá governar por 48 meses.</div>';return;}
+    if(!g){el.innerHTML=`<div class="panel">Vença a eleição para ${officeNames[state.office]||"o cargo escolhido"} e assuma seu mandato em ${state.district||"seu território"}.</div>`;return;}
     const metric=(name,v,unit="")=>`<div class="metric-card"><span>${name}</span><strong>${round1(v)}${unit}</strong></div>`;
     el.innerHTML=`<div class="metric-grid" style="margin-top:0">
       ${metric("Aprovação",g.approval,"%")}${metric("Inflação (simulada)",g.inflation,"%")}${metric("Desemprego (simulado)",g.unemployment,"%")}${metric("PIB (crescimento simulado)",g.gdp,"%")}
-      ${metric("Dívida pública/PIB",g.debt,"%")}${metric("Base no Congresso",g.congress+g.coalition,"%")}${metric("Orçamento do mandato",g.budget," bi")}${metric("Mês de governo",g.month," / 48")}
+      ${metric("Dívida pública/PIB (simulada)",g.debt,"%")}${metric("Apoio legislativo",g.congress+g.coalition,"%")}${metric("Orçamento do mandato",g.budget," bi")}${metric("Mês de mandato",g.month,` / ${g.maxMonths}`)}
     </div>
     <div class="panel" style="margin-top:14px"><h3>Políticas públicas</h3><p>Votações simuladas dependem da força da base parlamentar. Cada proposta custa 1 ação.</p><div class="action-grid">${policyDefs.map(p=>`<div class="action-card"><div><h4>${p.title}</h4><p>${p.desc} Custo: ${p.cost} bilhões fictícios.</p></div><button class="btn btn-primary" ${state.energy<1||g.budget<p.cost||state.finished?'disabled':''} onclick="window.__game.governmentPolicy('${p.id}')">Propor</button></div>`).join('')}</div></div>
     <div class="panel" style="margin-top:14px"><h3>Gabinete e governabilidade</h3><div class="card-actions"><button class="btn" onclick="window.__game.cabinetAction('coalition')" ${state.energy<1||state.finished?'disabled':''}>Negociar base</button><button class="btn" onclick="window.__game.cabinetAction('transparent')" ${state.energy<1||state.finished?'disabled':''}>Fiscalização e transparência</button><button class="btn" onclick="window.__game.cabinetAction('communicate')" ${state.energy<1||state.finished?'disabled':''}>Prestar contas</button></div><p>Projetos aprovados: ${g.policies.length} • Saúde ${Math.round(g.health)} • Educação ${Math.round(g.education)} • Segurança ${Math.round(g.security)}</p></div>`;
@@ -620,16 +651,16 @@
     const delta = nat - previousNational;
 
     $("candidateTitle").textContent = state.candidate;
-    $("candidateSubtitle").textContent = `${state.party} · ${ideologyLabel(state.ideology)}`;
+    $("candidateSubtitle").textContent = `${state.party} · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"} · ${ideologyLabel(state.ideology)}`;
     $("nationalPoll").textContent = `${round1(nat)}%`;
     $("fundsMetric").textContent = money(state.funds);
     $("reputationMetric").textContent = Math.round(state.reputation);
     $("mediaMetric").textContent = `${state.media >= 0 ? "+" : ""}${round1(state.media)}`;
     $("mediaMetric").className = state.media > 2 ? "positive" : state.media < -2 ? "negative" : "";
     $("groundMetric").textContent = Math.round(state.ground);
-    $("weekDisplay").textContent = state.phase === "government" ? `${state.administration.month}/48` : state.week;
+    $("weekDisplay").textContent = state.phase === "government" ? `${state.administration.month}/${state.administration.maxMonths}` : state.week;
     $("energyDisplay").textContent = `${state.energy}/${state.maxEnergy}`;
-    $("campaignPhase").textContent = state.phase === "government" ? "GOVERNO FEDERAL · SIMULAÇÃO" : state.phase === "runoff" ? "SEGUNDO TURNO" : state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
+    $("campaignPhase").textContent = state.phase === "government" ? `MANDATO · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"}` : state.phase === "runoff" ? "SEGUNDO TURNO" : state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
     $("trendBadge").textContent = Math.abs(delta) < .15 ? "estável" : delta > 0 ? `+${round1(delta)} p.p.` : `${round1(delta)} p.p.`;
     $("trendBadge").className = `badge ${delta > .15 ? "positive" : delta < -.15 ? "negative" : ""}`;
 
@@ -871,7 +902,7 @@
     return obj && typeof obj === "object" &&
       typeof obj.candidate === "string" && typeof obj.party === "string" &&
       Number.isFinite(obj.week) && Number.isFinite(obj.funds) &&
-      Array.isArray(obj.regions) && (obj.regions.length === 4 || obj.regions.length === 27) &&
+      Array.isArray(obj.regions) && (obj.regions.length === 4 || obj.regions.length === 5 || obj.regions.length === 27) &&
       obj.regions.every(r => r && typeof r.id === "string" && Number.isFinite(r.support) && Number.isFinite(r.voters)) &&
       Array.isArray(obj.opponents) && Array.isArray(obj.news) &&
       Array.isArray(obj.coalitions) && obj.proposals && typeof obj.proposals === "object";
@@ -883,6 +914,8 @@
       const old=state.regions;
       state.regions=baseRegions.map((r,i)=>({...r,support:clamp(old[i%4].support+rnd(-1.5,1.5),4,62),organization:old[i%4].organization}));
     }
+    state.office ??= "presidente";
+    state.district ??= "Brasil";
     state.phase ??= state.finished ? "ended":"campaign";
     state.electionHistory ??= [];
     state.administration ??= null;
@@ -955,11 +988,21 @@
       media: "Mídia",
       coalitions: "Alianças",
       integrity: "Integridade",
-      government: "Presidência"
+      government: "Mandato"
     };
     $("pageTitle").textContent = labels[view];
   }
 
+  function updateOfficeForm(){
+    const office=selectedOffice();
+    $("stateSelectLabel").classList.toggle("hidden",office==="presidente");
+    $("citySelectLabel").classList.toggle("hidden",!(office==="prefeito"||office==="vereador"));
+  }
+  $("stateChoice").innerHTML=baseRegions.map(r=>`<option value="${r.uf}">${r.name} (${r.uf})</option>`).join("");
+  $("stateChoice").value="ES";
+  $("officeChoice").onchange=updateOfficeForm;
+  $("stateChoice").onchange=()=>{$("cityChoice").value=citiesByState[$("stateChoice").value]||"";};
+  updateOfficeForm();
   $("startGame").onclick = startGame;
   $("loadGameSetup").onclick = loadGame;
   $("saveGame").onclick = saveGame;
