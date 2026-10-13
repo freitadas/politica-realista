@@ -6,14 +6,35 @@
   const money = (n) => `R$ ${round1(n)} mi`;
 
   const baseRegions = [
-    { id: "norte", name: "Norte", voters: 13, issue: "Infraestrutura", support: 19, undecided: 20, organization: 18, media: 0 },
-    { id: "leste", name: "Leste Industrial", voters: 31, issue: "Emprego e renda", support: 22, undecided: 16, organization: 22, media: 0 },
-    { id: "centro", name: "Centro Metropolitano", voters: 27, issue: "Segurança pública", support: 24, undecided: 18, organization: 20, media: 0 },
-    { id: "sul", name: "Sul Agrícola", voters: 29, issue: "Custo de vida", support: 20, undecided: 19, organization: 17, media: 0 }
+    { id: "ac", name: "Acre", uf:"AC", voters:0.6, issue:"Infraestrutura", support:19, undecided:15, organization:14, media:0 },
+    { id: "al", name: "Alagoas", uf:"AL", voters:2.0, issue:"Saúde", support:26, undecided:18, organization:19, media:0 },
+    { id: "ap", name: "Amapá", uf:"AP", voters:0.5, issue:"Infraestrutura", support:24, undecided:21, organization:24, media:0 },
+    { id: "am", name: "Amazonas", uf:"AM", voters:2.6, issue:"Infraestrutura", support:22, undecided:17, organization:15, media:0 },
+    { id: "ba", name: "Bahia", uf:"BA", voters:7.7, issue:"Emprego e renda", support:20, undecided:20, organization:20, media:0 },
+    { id: "ce", name: "Ceará", uf:"CE", voters:4.9, issue:"Saúde", support:27, undecided:16, organization:25, media:0 },
+    { id: "df", name: "Distrito Federal", uf:"DF", voters:1.7, issue:"Segurança pública", support:25, undecided:19, organization:16, media:0 },
+    { id: "es", name: "Espírito Santo", uf:"ES", voters:2.3, issue:"Segurança pública", support:23, undecided:15, organization:21, media:0 },
+    { id: "go", name: "Goiás", uf:"GO", voters:4.0, issue:"Custo de vida", support:21, undecided:18, organization:26, media:0 },
+    { id: "ma", name: "Maranhão", uf:"MA", voters:3.7, issue:"Emprego e renda", support:19, undecided:21, organization:17, media:0 },
+    { id: "mt", name: "Mato Grosso", uf:"MT", voters:2.1, issue:"Infraestrutura", support:26, undecided:17, organization:22, media:0 },
+    { id: "ms", name: "Mato Grosso do Sul", uf:"MS", voters:1.6, issue:"Custo de vida", support:24, undecided:20, organization:27, media:0 },
+    { id: "mg", name: "Minas Gerais", uf:"MG", voters:11.3, issue:"Emprego e renda", support:22, undecided:16, organization:18, media:0 },
+    { id: "pa", name: "Pará", uf:"PA", voters:4.4, issue:"Infraestrutura", support:20, undecided:19, organization:23, media:0 },
+    { id: "pb", name: "Paraíba", uf:"PB", voters:2.4, issue:"Saúde", support:27, undecided:15, organization:14, media:0 },
+    { id: "pr", name: "Paraná", uf:"PR", voters:6.3, issue:"Emprego e renda", support:25, undecided:18, organization:19, media:0 },
+    { id: "pe", name: "Pernambuco", uf:"PE", voters:5.1, issue:"Saúde", support:23, undecided:21, organization:24, media:0 },
+    { id: "pi", name: "Piauí", uf:"PI", voters:1.9, issue:"Saúde", support:21, undecided:17, organization:15, media:0 },
+    { id: "rj", name: "Rio de Janeiro", uf:"RJ", voters:9.0, issue:"Segurança pública", support:19, undecided:20, organization:20, media:0 },
+    { id: "rn", name: "Rio Grande do Norte", uf:"RN", voters:2.0, issue:"Saúde", support:26, undecided:16, organization:25, media:0 },
+    { id: "rs", name: "Rio Grande do Sul", uf:"RS", voters:6.1, issue:"Custo de vida", support:24, undecided:19, organization:16, media:0 },
+    { id: "ro", name: "Rondônia", uf:"RO", voters:0.9, issue:"Infraestrutura", support:22, undecided:15, organization:21, media:0 },
+    { id: "rr", name: "Roraima", uf:"RR", voters:0.4, issue:"Infraestrutura", support:20, undecided:18, organization:26, media:0 },
+    { id: "sc", name: "Santa Catarina", uf:"SC", voters:4.4, issue:"Emprego e renda", support:27, undecided:21, organization:17, media:0 },
+    { id: "sp", name: "São Paulo", uf:"SP", voters:23.8, issue:"Emprego e renda", support:25, undecided:17, organization:22, media:0 },
+    { id: "se", name: "Sergipe", uf:"SE", voters:1.2, issue:"Saúde", support:23, undecided:20, organization:27, media:0 },
+    { id: "to", name: "Tocantins", uf:"TO", voters:0.9, issue:"Infraestrutura", support:21, undecided:16, organization:18, media:0 },
   ];
 
-  // Políticos reais inseridos apenas como personagens de eleição contrafactual.
-  // Pesquisas, comportamentos e resultados do jogo não refletem dados reais.
   const opponents = [
     { id: "lula", name: "Luiz Inácio Lula da Silva", party: "PT", poll: 30.5 },
     { id: "flavio", name: "Flávio Bolsonaro", party: "PL", poll: 26.2 },
@@ -255,7 +276,11 @@
     const bonus = ideologyEffects[ideology];
 
     return {
-      version: 1,
+      version: 4,
+      phase: "campaign",
+      office: "presidente",
+      administration: null,
+      electionHistory: [],
       candidate: $("candidateName").value.trim() || "Alex Moreira",
       party: $("partyName").value.trim() || "Aliança Cívica",
       ideology,
@@ -321,7 +346,7 @@
   }
 
   function spendAction(def) {
-    if (state.finished) return;
+    if (state.finished || state.phase === "government") return;
     if (state.energy <= 0) return showToast("Sem pontos de agenda nesta semana");
     if (state.funds < def.cost) return showToast("Caixa insuficiente");
     state.funds -= def.cost;
@@ -355,6 +380,8 @@
 
   function takeTurn() {
     if (state.finished) return;
+    if (state.phase === "government") return governmentTurn();
+    if (state.phase === "runoff") return runoffElection();
     if (state.week <= 1) return election();
 
     previousNational = nationalSupport();
@@ -411,40 +438,122 @@
   }
 
   function election() {
-    const base = nationalSupport();
-    const orgBonus = (state.ground - 25) / 40;
-    const repBonus = (state.reputation - 50) / 60;
-    const randomShock = rnd(-1.5, 1.5);
-    const finalVote = clamp(base + orgBonus + repBonus + randomShock, 5, 60);
+    const estimates = [
+      {name: state.candidate, votes: nationalSupport() + (state.ground-25)/40 + (state.reputation-50)/60 + rnd(-1,1)},
+      ...state.opponents.map(o => ({name:o.name,votes:o.poll+rnd(-1,1)}))
+    ];
+    const total = estimates.reduce((x,c)=>x+Math.max(c.votes,1),0);
+    estimates.forEach(c => c.votes = round1(100*Math.max(c.votes,1)/total));
+    estimates.sort((a,b)=>b.votes-a.votes);
+    state.electionHistory = state.electionHistory || [];
+    state.electionHistory.push({round:1,results:estimates});
+    state.week=0;
+    if (estimates[0].votes>50) return concludeElection(estimates[0].name === state.candidate,estimates[0].votes,1);
+    const finalist=estimates.slice(0,2);
+    if(!finalist.some(c=>c.name===state.candidate)) return concludeElection(false,estimates.find(c=>c.name===state.candidate).votes,1);
+    state.phase="runoff";
+    state.runoffRival=finalist.find(c=>c.name!==state.candidate).name;
+    state.energy=3;
+    state.week=2;
+    state.runoffBase=clamp(50+(estimates.find(c=>c.name===state.candidate).votes - finalist.find(c=>c.name!==state.candidate).votes)*.55,32,68);
+    addNews("Segundo turno confirmado",`Disputa final contra ${state.runoffRival} em duas rodadas decisivas.`);
+    showDecision("Segundo turno",`Sua candidatura enfrentará ${state.runoffRival}. As duas próximas semanas serão decisivas.`,"Continuar",()=>navTo("overview"));
+    renderAll();
+  }
 
-    const rival = Math.max(...state.opponents.map(o => o.poll + rnd(-1,1)));
-    const won = finalVote > rival;
-    state.finished = true;
-    state.week = 0;
+  function runoffElection() {
+    if (state.week>1) {
+      state.runoffBase=clamp(state.runoffBase+(nationalSupport()-25)/25+rnd(-1.5,1.5),25,75);
+      state.week--;
+      state.energy=3;
+      addNews("Pesquisa de segundo turno",`Disputa permanece competitiva contra ${state.runoffRival}.`);
+      renderAll(); return;
+    }
+    const share=clamp(state.runoffBase+(state.reputation-50)/30+state.media/22+rnd(-2,2),15,85);
+    state.electionHistory.push({round:2,results:[{name:state.candidate,votes:round1(share)},{name:state.runoffRival,votes:round1(100-share)}]});
+    concludeElection(share>50,share,2);
+  }
 
-    $("modalTitle").textContent = won ? "Vitória eleitoral" : "Fim da campanha";
-    $("modalText").innerHTML = `
-      <div class="election-result">
-        <span>Resultado estimado</span>
-        <strong>${round1(finalVote)}%</strong>
-        <h3>${won ? "Você venceu a eleição." : "A candidatura não alcançou a primeira colocação."}</h3>
-        <p>${won
-          ? "A combinação de voto territorial, reputação e organização foi suficiente para formar a maior coalizão eleitoral."
-          : "O desempenho final ficou abaixo do principal adversário. O resultado pode ser usado para recalibrar uma nova campanha."}</p>
-      </div>`;
-    $("modalChoices").innerHTML = "";
-    const b = document.createElement("button");
-    b.className = "btn btn-primary full";
-    b.textContent = "Ver painel final";
-    b.onclick = () => {
-      $("modalBackdrop").classList.add("hidden");
-      renderAll();
-    };
-    $("modalChoices").appendChild(b);
-    $("modalBackdrop").classList.remove("hidden");
+  function showDecision(title,text,button,callback) {
+    $("modalTitle").textContent=title;
+    $("modalText").textContent=text;
+    $("modalChoices").innerHTML="";
+    const b=document.createElement("button");b.className="btn btn-primary full";b.textContent=button;
+    b.onclick=()=>{$("modalBackdrop").classList.add("hidden");callback?.();renderAll();};
+    $("modalChoices").appendChild(b);$("modalBackdrop").classList.remove("hidden");
+  }
+
+  function concludeElection(won,percent,round) {
+    state.week=0;
+    if(won) {
+      state.phase="government";
+      state.administration={month:1,maxMonths:48,approval:clamp(state.reputation+5,30,80),congress:46,
+        inflation:5.8,unemployment:8.4,gdp:1.6,debt:74,health:48,education:49,security:45,
+        budget:80,coalition:0,policies:[],history:[]};
+      state.energy=3;
+      addNews("Posse presidencial fictícia",`Vitória com ${round1(percent)}% no ${round}º turno. Começa a fase de governo.`);
+      showDecision("Eleição vencida",`Você obteve ${round1(percent)}% dos votos na simulação. O mandato começa agora: governe por 48 meses.`,"Assumir presidência",()=>navTo("government"));
+    } else {
+      state.phase="ended"; state.finished=true;
+      showDecision("Derrota eleitoral",`Sua candidatura terminou com ${round1(percent)}% no ${round}º turno da eleição simulada.`,"Ver resultados",()=>navTo("overview"));
+    }
+    renderAll();
+  }
+
+  const policyDefs=[
+    {id:"health",title:"Expandir atenção básica",desc:"Melhora saúde, requer orçamento.",cost:9,congress:2,approval:2,health:8,debt:1.1},
+    {id:"education",title:"Investir na educação",desc:"Amplia escolas e qualificação.",cost:8,congress:1,approval:2,education:8,debt:0.8},
+    {id:"security",title:"Programa integrado de segurança",desc:"Coordenação e prevenção.",cost:7,congress:1,approval:1,security:8,debt:0.5},
+    {id:"tax",title:"Reforma tributária",desc:"Melhora arrecadação, exige base parlamentar.",cost:2,congress:-6,approval:-1,debt:-2,gdp:.4},
+    {id:"jobs",title:"Plano de emprego e infraestrutura",desc:"Gera empregos com custo fiscal.",cost:12,congress:1,approval:2,unemployment:-.7,gdp:.6,debt:1.3},
+    {id:"austerity",title:"Ajuste fiscal",desc:"Reduz dívida, mas provoca desgaste.",cost:0,congress:-3,approval:-4,debt:-3,inflation:-.3,gdp:-.3}
+  ];
+  function governmentPolicy(id){
+    const g=state?.administration,p=policyDefs.find(x=>x.id===id);
+    if(!g || !p || state.energy<1 || g.budget<p.cost)return showToast("Ações ou orçamento insuficientes");
+    state.energy--;g.budget-=p.cost;
+    const votes=clamp(g.congress+g.coalition+rnd(-12,12),0,100);
+    if(votes<50){g.approval-=1;addNews("Projeto rejeitado no Congresso",`A proposta “${p.title}” não obteve votos suficientes (${Math.round(votes)}% de apoio).`);renderAll();return;}
+    for(const [key,val] of Object.entries(p))if(typeof val==="number"&&key!=="cost"&&key!=="congress")g[key]=(g[key]||0)+val;
+    g.congress=clamp(g.congress+p.congress,0,100);
+    g.policies.push({month:g.month,title:p.title,votes:Math.round(votes)});
+    addNews("Projeto aprovado",`${p.title}: aprovado com ${Math.round(votes)}% de apoio simulado no Congresso.`);
+    renderAll();
+  }
+  function cabinetAction(type){
+    const g=state?.administration;if(!g || state.energy<1)return;
+    state.energy--;
+    if(type==="coalition") {g.coalition=clamp(g.coalition+7,0,25);g.congress=clamp(g.congress+3,0,100);g.approval-=1;addNews("Acordo parlamentar fictício","A base de sustentação do governo aumenta.");}
+    if(type==="transparent") {state.integrity=clamp(state.integrity+9,0,100);state.corruptionRisk=clamp(state.corruptionRisk-10,0,100);g.approval+=2;addNews("Portal de transparência","Controle social e fiscalização administrativa reforçados.");}
+    if(type==="communicate") {g.approval+=2;g.budget=Math.max(0,g.budget-2);addNews("Prestação de contas","Governo apresentou resultados e desafios à população.");}
+    normalize();renderAll();
+  }
+  function governmentTurn(){
+    const g=state.administration;if(!g || state.finished)return;
+    const shock=rnd(-1,1);g.approval=clamp(g.approval+shock+(g.gdp-1.5)/4-(g.inflation-5)/6-(g.unemployment-8)/5-(state.investigation||0)/125,0,100);
+    g.inflation=clamp(g.inflation+rnd(-.4,.45),0,30);g.unemployment=clamp(g.unemployment+rnd(-.3,.3),1,30);
+    g.gdp=clamp(g.gdp+rnd(-.2,.2),-8,12);g.debt=clamp(g.debt+(.15+(g.inflation-5)/70),0,160);
+    g.budget+=7;g.congress=clamp(g.congress+rnd(-2,2),0,100);
+    resolveIntegrityTurn();g.history.push({month:g.month,approval:round1(g.approval),inflation:round1(g.inflation)});
+    if(g.month>=g.maxMonths){state.finished=true;state.phase="ended";showDecision("Fim do mandato",`Aprovação final de ${round1(g.approval)}%. Você aprovou ${g.policies.length} projetos. O resultado de sua gestão foi registrado no histórico.`,"Ver balanço",()=>navTo("government"));}
+    else {g.month++;state.energy=3;addNews("Novo mês de governo",`Mês ${g.month} de 48: inflação ${round1(g.inflation)}%, desemprego ${round1(g.unemployment)}%.`);}
+    renderAll();
+  }
+  function renderGovernment(){
+    const el=$("governmentContent");if(!el)return;
+    const g=state.administration;
+    if(!g){el.innerHTML='<div class="panel">Vença a eleição para assumir a presidência. Após a posse você poderá governar por 48 meses.</div>';return;}
+    const metric=(name,v,unit="")=>`<div class="metric-card"><span>${name}</span><strong>${round1(v)}${unit}</strong></div>`;
+    el.innerHTML=`<div class="metric-grid" style="margin-top:0">
+      ${metric("Aprovação",g.approval,"%")}${metric("Inflação (simulada)",g.inflation,"%")}${metric("Desemprego (simulado)",g.unemployment,"%")}${metric("PIB (crescimento simulado)",g.gdp,"%")}
+      ${metric("Dívida pública/PIB",g.debt,"%")}${metric("Base no Congresso",g.congress+g.coalition,"%")}${metric("Orçamento do mandato",g.budget," bi")}${metric("Mês de governo",g.month," / 48")}
+    </div>
+    <div class="panel" style="margin-top:14px"><h3>Políticas públicas</h3><p>Votações simuladas dependem da força da base parlamentar. Cada proposta custa 1 ação.</p><div class="action-grid">${policyDefs.map(p=>`<div class="action-card"><div><h4>${p.title}</h4><p>${p.desc} Custo: ${p.cost} bilhões fictícios.</p></div><button class="btn btn-primary" ${state.energy<1||g.budget<p.cost||state.finished?'disabled':''} onclick="window.__game.governmentPolicy('${p.id}')">Propor</button></div>`).join('')}</div></div>
+    <div class="panel" style="margin-top:14px"><h3>Gabinete e governabilidade</h3><div class="card-actions"><button class="btn" onclick="window.__game.cabinetAction('coalition')" ${state.energy<1||state.finished?'disabled':''}>Negociar base</button><button class="btn" onclick="window.__game.cabinetAction('transparent')" ${state.energy<1||state.finished?'disabled':''}>Fiscalização e transparência</button><button class="btn" onclick="window.__game.cabinetAction('communicate')" ${state.energy<1||state.finished?'disabled':''}>Prestar contas</button></div><p>Projetos aprovados: ${g.policies.length} • Saúde ${Math.round(g.health)} • Educação ${Math.round(g.education)} • Segurança ${Math.round(g.security)}</p></div>`;
   }
 
   function chooseProposal(proposalId, optionId) {
+    if (state.phase === "government") return showToast("Use a aba Presidência");
     if (state.energy <= 0) return showToast("Sem pontos de agenda nesta semana");
     if (state.proposals[proposalId]) return showToast("Essa posição já foi definida");
 
@@ -455,9 +564,11 @@
 
     state.reputation += option.rep || 0;
     state.funds += option.funds || 0;
-    Object.entries(option.region || {}).forEach(([id,val]) => {
-      const r = state.regions.find(x => x.id === id);
-      if (r) r.support += val;
+    // Propostas distribuem seu efeito pelas UFs conforme a prioridade temática.
+    const totalEffect=Object.values(option.region || {}).reduce((a,v)=>a+v,0);
+    state.regions.forEach(r => {
+      const focus = proposalId === "security" ? "Segurança pública" : proposalId === "economy" ? "Emprego e renda" : "Custo de vida";
+      r.support += totalEffect / 5 * (r.issue === focus ? 1.4 : .6);
     });
     addNews(`Proposta: ${proposal.title}`, `Campanha apresentou posição oficial: "${option.label}".`);
     normalize();
@@ -516,9 +627,9 @@
     $("mediaMetric").textContent = `${state.media >= 0 ? "+" : ""}${round1(state.media)}`;
     $("mediaMetric").className = state.media > 2 ? "positive" : state.media < -2 ? "negative" : "";
     $("groundMetric").textContent = Math.round(state.ground);
-    $("weekDisplay").textContent = state.week;
+    $("weekDisplay").textContent = state.phase === "government" ? `${state.administration.month}/48` : state.week;
     $("energyDisplay").textContent = `${state.energy}/${state.maxEnergy}`;
-    $("campaignPhase").textContent = state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
+    $("campaignPhase").textContent = state.phase === "government" ? "GOVERNO FEDERAL · SIMULAÇÃO" : state.phase === "runoff" ? "SEGUNDO TURNO" : state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
     $("trendBadge").textContent = Math.abs(delta) < .15 ? "estável" : delta > 0 ? `+${round1(delta)} p.p.` : `${round1(delta)} p.p.`;
     $("trendBadge").className = `badge ${delta > .15 ? "positive" : delta < -.15 ? "negative" : ""}`;
 
@@ -531,6 +642,9 @@
     renderMedia();
     renderCoalitions();
     renderIntegrity();
+    renderGovernment();
+    $("nextTurn").textContent=state.phase==="government"?"Avançar um mês":state.phase==="runoff"?"Avançar segundo turno":"Avançar uma semana";
+    writeSave(false);
   }
 
   function renderPolls(nat) {
@@ -593,7 +707,7 @@
             <span class="mini-chip">${a.tag}</span>
           </div>
         </div>
-        <button class="btn btn-primary" ${state.finished || state.energy<=0 || state.funds<a.cost ? "disabled" : ""}
+        <button class="btn btn-primary" ${state.finished || state.energy<=0 || state.funds<a.cost || state.phase==="government" ? "disabled" : ""}
           onclick="window.__game.spendAction('${a.id}')">Executar</button>
       </div>`).join("");
   }
@@ -606,7 +720,7 @@
         <p>${p.text}</p>
         <div class="option-stack">
           ${p.options.map(o => `<button class="option-btn ${selected===o.id ? "selected" : ""}"
-            ${selected || state.finished || state.energy<=0 ? "disabled" : ""}
+            ${selected || state.finished || state.energy<=0 || state.phase==="government" ? "disabled" : ""}
             onclick="window.__game.chooseProposal('${p.id}','${o.id}')">${o.label}</button>`).join("")}
         </div>
       </div>`;
@@ -732,25 +846,84 @@
     }[v] || v;
   }
 
-  function saveGame() {
-    if (!state) return;
-    localStorage.setItem("mandato_save_v1", JSON.stringify(state));
-    showToast("Jogo salvo neste navegador");
-  }
-
-  function loadGame() {
-    const raw = localStorage.getItem("mandato_save_v1");
-    if (!raw) return showToast("Nenhum salvamento encontrado");
+  const SAVE_KEY = "mandato_save_v1";
+  function writeSave(announce = false) {
+    if (!state) return false;
     try {
-      state = JSON.parse(raw);
-      previousNational = nationalSupport();
-      $("setup").classList.add("hidden");
-      $("game").classList.remove("hidden");
-      renderAll();
-      showToast("Salvamento carregado");
-    } catch {
-      showToast("Salvamento inválido");
+      const snapshot = JSON.stringify(state);
+      localStorage.setItem(SAVE_KEY, snapshot);
+      if (localStorage.getItem(SAVE_KEY) !== snapshot) throw new Error("Falha na confirmação");
+      const indicator = $("saveStatus");
+      if (indicator) indicator.textContent = "Salvo neste dispositivo";
+      if (announce) showToast("Progresso salvo neste dispositivo");
+      return true;
+    } catch (err) {
+      const indicator = $("saveStatus");
+      if (indicator) indicator.textContent = "Não foi possível salvar; exporte o backup";
+      if (announce) showToast("Armazenamento indisponível: exporte um backup");
+      console.warn("Falha ao salvar", err);
+      return false;
     }
+  }
+  function saveGame() { writeSave(true); }
+
+  function isValidSave(obj) {
+    return obj && typeof obj === "object" &&
+      typeof obj.candidate === "string" && typeof obj.party === "string" &&
+      Number.isFinite(obj.week) && Number.isFinite(obj.funds) &&
+      Array.isArray(obj.regions) && (obj.regions.length === 4 || obj.regions.length === 27) &&
+      obj.regions.every(r => r && typeof r.id === "string" && Number.isFinite(r.support) && Number.isFinite(r.voters)) &&
+      Array.isArray(obj.opponents) && Array.isArray(obj.news) &&
+      Array.isArray(obj.coalitions) && obj.proposals && typeof obj.proposals === "object";
+  }
+  function applySave(data) {
+    if (!isValidSave(data)) throw new Error("Arquivo de jogo inválido");
+    state = data;
+    if (state.regions.length === 4) {
+      const old=state.regions;
+      state.regions=baseRegions.map((r,i)=>({...r,support:clamp(old[i%4].support+rnd(-1.5,1.5),4,62),organization:old[i%4].organization}));
+    }
+    state.phase ??= state.finished ? "ended":"campaign";
+    state.electionHistory ??= [];
+    state.administration ??= null;
+    state.integrity ??= 65;
+    state.corruptionRisk ??= 0;
+    state.investigation ??= 0;
+    state.illicitFunds ??= 0;
+    previousNational = nationalSupport();
+    $("setup").classList.add("hidden");
+    $("game").classList.remove("hidden");
+    renderAll();
+  }
+  function loadGame() {
+    let raw;
+    try { raw = localStorage.getItem(SAVE_KEY); }
+    catch { return showToast("Navegador bloqueou o armazenamento. Importe um backup."); }
+    if (!raw) return showToast("Nenhum salvamento encontrado neste dispositivo");
+    try { applySave(JSON.parse(raw)); showToast("Progresso carregado"); }
+    catch { showToast("Salvamento inválido; tente importar um backup"); }
+  }
+  function exportSave() {
+    if (!state) return showToast("Comece ou carregue uma campanha primeiro");
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mandato-backup-semana-${state.week}.json`;
+    document.body.appendChild(link);
+    link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast("Backup exportado");
+  }
+  async function importSaveFile(file) {
+    if (!file) return;
+    try {
+      if (file.size > 2_000_000) throw new Error("Arquivo muito grande");
+      const data = JSON.parse(await file.text());
+      applySave(data);
+      writeSave(false);
+      showToast("Backup importado com sucesso");
+    } catch (err) { showToast(`Erro ao importar: ${err.message}`); }
   }
 
   function newGameConfirm() {
@@ -781,7 +954,8 @@
       proposals: "Propostas",
       media: "Mídia",
       coalitions: "Alianças",
-      integrity: "Integridade"
+      integrity: "Integridade",
+      government: "Presidência"
     };
     $("pageTitle").textContent = labels[view];
   }
@@ -789,6 +963,11 @@
   $("startGame").onclick = startGame;
   $("loadGameSetup").onclick = loadGame;
   $("saveGame").onclick = saveGame;
+  $("saveGameTop").onclick = saveGame;
+  $("exportGame").onclick = exportSave;
+  $("exportGameTop").onclick = exportSave;
+  $("importGameSetup").onclick = () => $("backupFile").click();
+  $("backupFile").onchange = (e) => { importSaveFile(e.target.files?.[0]); e.target.value = ""; };
   $("newGame").onclick = newGameConfirm;
   $("nextTurn").onclick = takeTurn;
   document.querySelectorAll(".nav-item").forEach(b => b.onclick = () => navTo(b.dataset.view));
@@ -801,6 +980,7 @@
     chooseProposal,
     negotiateCoalition,
     regionalVisit,
-    integrityAction
+    integrityAction,
+    governmentPolicy, cabinetAction
   };
 })();

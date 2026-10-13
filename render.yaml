@@ -3,6 +3,6 @@ services:
     name: mandato-politico-game
     runtime: static
     buildCommand: echo "Static site ready"
-    staticPublishPath: ./public
+    staticPublishPath: .
     previews:
       generation: automatic

@@ -418,3 +418,6 @@ nav { display: grid; gap: 8px; margin-top: 34px; }
   .hero-poll strong { font-size: 34px; }
   .top-meta .meta-box:first-child { display: none; }
 }
+
+.save-status { text-align:right; font-size:11px; color:var(--muted); margin:0 0 12px; }
+@media(max-width:560px) { .top-meta #exportGameTop { display:none; } .top-meta #saveGameTop { padding:9px; } }

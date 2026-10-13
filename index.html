@@ -21,8 +21,8 @@
         </div>
 
         <p class="setup-intro">
-          Dispute a presidência da fictícia República de Aurélia. Gerencie campanha,
-          orçamento, imprensa, alianças, crises e propostas durante 24 semanas.
+          Dispute a presidência da fictícia República de Aurélia. Gerencie campanha, segundo turno e governo: 27 unidades federativas, Congresso,
+          economia, investigações fictícias e políticas públicas.
         </p>
 
         <div class="setup-grid">
@@ -76,9 +76,11 @@
 
         <div class="setup-actions">
           <button id="startGame" class="btn btn-primary">Começar campanha</button>
-          <button id="loadGameSetup" class="btn btn-ghost">Carregar salvamento</button>
+          <button id="loadGameSetup" class="btn btn-ghost">Continuar campanha</button>
+          <button id="importGameSetup" class="btn btn-ghost">Importar backup</button>
         </div>
 
+        <input type="file" id="backupFile" accept=".json,application/json" class="hidden" aria-label="Arquivo de backup do jogo" />
         <div class="setup-note">
           Simulação alternativa: nomes de partidos e políticos reais; pesquisas, atos de campanha, corrupção e resultados inteiramente fictícios. Nenhuma acusação a pessoas ou partidos reais.
         </div>
@@ -103,10 +105,12 @@
           <button class="nav-item" data-view="media">Mídia</button>
           <button class="nav-item" data-view="coalitions">Alianças</button>
           <button class="nav-item" data-view="integrity">Integridade</button>
+          <button class="nav-item" data-view="government">Presidência</button>
         </nav>
 
         <div class="sidebar-bottom">
           <button id="saveGame" class="btn btn-ghost full">Salvar jogo</button>
+          <button id="exportGame" class="btn btn-ghost full">Baixar backup</button>
           <button id="newGame" class="btn btn-danger full">Nova campanha</button>
         </div>
       </aside>
@@ -118,6 +122,8 @@
             <h2 id="pageTitle">Visão geral</h2>
           </div>
           <div class="top-meta">
+            <button id="saveGameTop" class="btn btn-ghost">Salvar</button>
+            <button id="exportGameTop" class="btn btn-ghost">Backup</button>
             <div class="meta-box">
               <span>Semana</span>
               <strong id="weekDisplay">24</strong>
@@ -130,6 +136,7 @@
         </header>
 
         <div class="content">
+          <p id="saveStatus" class="save-status" aria-live="polite">Salvamento automático ativo</p>
           <section id="overviewView" class="view active">
             <div class="hero-card">
               <div>
@@ -214,13 +221,14 @@
             </div>
           </section>
 
+          <section id="governmentView" class="view"><div class="section-lead"><div><p class="eyebrow">GESTÃO PÚBLICA</p><h3>Presidência e políticas públicas</h3></div><p>Governe o país depois de vencer a eleição.</p></div><div id="governmentContent"></div></section>
           <section id="regionsView" class="view">
             <div class="section-lead">
               <div>
                 <p class="eyebrow">TERRITÓRIO</p>
                 <h3>Mapa eleitoral</h3>
               </div>
-              <p>Concentre recursos onde o eleitorado é numeroso ou a disputa está apertada.</p>
+              <p>Explore as 27 unidades federativas. Os pesos eleitorais e cenários desta simulação são inventados, não dados oficiais.</p>
             </div>
             <div id="regionGrid" class="region-grid"></div>
           </section>
