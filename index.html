@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101624" />
-  <meta name="description" content="Simulador político eleitoral realista em um país fictício." />
-  <title>Mandato — Simulador Político</title>
+  <meta name="description" content="Simulador de eleições brasileiras em cenário fictício com carreira, debates e gestão pública." />
+  <title>Mandato v7 — Simulador Político</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -36,6 +36,7 @@
           </select></label>
           <label id="stateSelectLabel"><span>Estado de candidatura</span><select id="stateChoice"></select></label>
           <label id="citySelectLabel" class="hidden"><span>Município da eleição</span><input id="cityChoice" maxlength="60" placeholder="Ex.: Vitória" value="Vitória" /></label>
+          <label id="electorateSelectLabel" class="hidden"><span>Eleitorado simulado do município</span><input id="electorateChoice" type="number" min="1000" max="15000000" step="1" value="300000" /></label>
         </div>
         <div class="setup-grid">
           <label>
@@ -94,7 +95,7 @@
 
         <input type="file" id="backupFile" accept=".json,application/json" class="hidden" aria-label="Arquivo de backup do jogo" />
         <div class="setup-note">
-          Simulação alternativa: nomes de partidos e políticos reais; pesquisas, atos de campanha, corrupção e resultados inteiramente fictícios. Carreira e elegibilidade entre cargos são regras simplificadas de jogo, não orientações jurídicas.
+          Cenário de história alternativa. Partidos e algumas personalidades são reais, mas pesquisas, ações dos oponentes, resultados, processos e eventos são inventados. Regras de campanha, elegibilidade e distribuição de cadeiras são aproximações didáticas.
         </div>
       </div>
     </section>
@@ -250,9 +251,9 @@
                 <p class="eyebrow">TERRITÓRIO</p>
                 <h3>Mapa eleitoral</h3>
               </div>
-              <p>Explore as 27 unidades federativas. Os pesos eleitorais e cenários desta simulação são inventados, não dados oficiais.</p>
+              <p>Explore os 26 estados e o Distrito Federal em um mapa clicável. Pesos eleitorais e cenários são gerados para o jogo, não são dados oficiais.</p>
             </div>
-            <div id="regionGrid" class="region-grid"></div>
+            <div class="panel map-panel"><div class="panel-head"><div><p class="eyebrow">TERRITÓRIO SIMULADO</p><h3>Brasil por unidade federativa</h3></div><span class="badge" id="mapSource">Mapa esquemático</span></div><div id="brazilMap" class="brazil-map" aria-label="Mapa interativo dos estados brasileiros"></div><p class="map-caption">Clique em um estado para localizar o respectivo cartão. Fronteiras reais são carregadas quando a conexão permitir; os resultados e pesos são fictícios.</p></div><div id="regionGrid" class="region-grid"></div>
           </section>
 
           <section id="agendaView" class="view">
@@ -286,6 +287,7 @@
               <p>Equilibre visibilidade, risco e capacidade de resposta.</p>
             </div>
             <div id="mediaContent"></div>
+            <div class="panel" style="margin-top:14px"><p class="eyebrow">ADVERSÁRIOS CONTROLADOS PELO JOGO</p><h3>Movimentações da disputa</h3><div id="rivalActivity" class="news-feed"></div></div>
           </section>
 
           <section id="integrityView" class="view">
@@ -300,7 +302,7 @@
               </div>
               <p>Negocie apoios sem destruir sua coerência programática.</p>
             </div>
-            <div id="coalitionGrid" class="coalition-grid"></div>
+            <div id="partyPanel" style="margin-bottom:14px"></div><div id="coalitionGrid" class="coalition-grid"></div>
           </section>
         </div>
       </main>

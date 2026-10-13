@@ -35,10 +35,18 @@
     { id: "to", name: "Tocantins", uf:"TO", voters:0.9, issue:"Infraestrutura", support:21, undecided:16, organization:18, media:0 },
   ];
 
+  // Synthetic weighting only: the source numbers are invented and normalized to 100.
+  const simulatedWeightTotal = baseRegions.reduce((sum, r) => sum + r.voters, 0);
+  baseRegions.forEach(r => r.voters = Math.round(r.voters / simulatedWeightTotal * 10000) / 100);
+
   const officeNames = {presidente:"Presidente da República",governador:"Governador",senador:"Senador",deputado_federal:"Deputado federal",deputado_estadual:"Deputado estadual / distrital",prefeito:"Prefeito",vereador:"Vereador"};
   const executiveOffices = new Set(["presidente","governador","prefeito"]);
   const legislativeOffices = new Set(["senador","deputado_federal","deputado_estadual","vereador"]);
   const citiesByState = {ES:"Vitória",SP:"São Paulo",RJ:"Rio de Janeiro",MG:"Belo Horizonte",BA:"Salvador",PR:"Curitiba",RS:"Porto Alegre",SC:"Florianópolis",DF:"Brasília",GO:"Goiânia",PE:"Recife",CE:"Fortaleza",AM:"Manaus",PA:"Belém",MA:"São Luís",PB:"João Pessoa",RN:"Natal",AL:"Maceió",SE:"Aracaju",PI:"Teresina",MT:"Cuiabá",MS:"Campo Grande",RO:"Porto Velho",RR:"Boa Vista",AP:"Macapá",AC:"Rio Branco",TO:"Palmas"};
+  const nextElectionYear = (office, afterYear=2025) => {
+    const first = office === "prefeito" || office === "vereador" ? 2028 : 2026;
+    return first > afterYear ? first : first + 4 * (Math.floor((afterYear-first)/4)+1);
+  };
   const fictionalRivals = [
     {id:"local1",name:"Marina Duarte",party:"MDB",poll:30.5},
     {id:"local2",name:"Eduardo Campos Filho",party:"PSD",poll:26.2},
@@ -62,6 +70,12 @@
     { id: "caiado", name: "Ronaldo Caiado", party: "PSD", poll: 12.4 }
   ];
 
+  // Fictional party-management attributes. No real party is being assessed or ranked.
+  function newPartyProfile(label){
+    const seed=[...String(label||"Partido")].reduce((a,ch)=>((a*33+ch.charCodeAt(0))>>>0),17);
+    return {organization:42+seed%25,cohesion:45+(seed>>>4)%28,compliance:46+(seed>>>9)%25,
+      development:32+(seed>>>13)%25};
+  }
   const ideologyEffects = {
     centro: { rep: 2, funds: 1.5, media: 1 },
     social: { rep: 1, funds: 0, media: 0 },
@@ -295,33 +309,40 @@
                       { funds: 15, support: 0, ai: .35 };
     const ideology = $("ideology").value;
     const bonus = ideologyEffects[ideology];
+    const partyProfile = newPartyProfile($("partyName").value);
 
     return {
-      version: 6,
+      version: 7,
       phase: "campaign",
       office: selectedOffice(),
       stateUF: $("stateChoice").value,
       municipality: $("cityChoice").value.trim(),
+      municipalityElectorate: Number($("electorateChoice").value) || 300000,
+      rivalActivity: [],
+      pendingEvent: null,
+      lastElection: null,
       district: selectedLocation(),
       administration: null,
       electionHistory: [],
       careerHistory: [],
       careerDraft: null,
       campaignNumber: 1,
+      electionYear: nextElectionYear(selectedOffice()),
       debateHistory: [],
       debateAvailable: null,
       pendingDebate: null,
       candidate: $("candidateName").value.trim() || "Alex Moreira",
       party: $("partyName").value.trim() || "Aliança Cívica",
       ideology,
+      partyProfile,
       difficulty: diff,
       week: 24,
       energy: 3,
       maxEnergy: 3,
-      funds: modifiers.funds + bonus.funds,
+      funds: modifiers.funds + bonus.funds + (partyProfile.development-45)/35,
       reputation: 52 + bonus.rep,
       media: bonus.media,
-      ground: 24,
+      ground: clamp(19 + partyProfile.organization/9,20,38),
       digital: 20,
       debate: 35,
       scandal: 6,
@@ -331,7 +352,7 @@
       illicitFunds: 0,
       ai: modifiers.ai,
       regions: electionDistricts(selectedOffice(), $("stateChoice").value, $("cityChoice").value.trim()).map(r => ({...r, support: r.support + modifiers.support})),
-      opponents: (selectedOffice()==="presidente"? opponents: fictionalRivals).map(o => ({...o})),
+      opponents: (selectedOffice()==="presidente"? opponents: fictionalRivals).map((o,i) => ({...o, funds: 11 + i*2, activity:"Preparando a campanha"})),
       proposals: {},
       coalitions: coalitionDefs.map(c => ({...c, secured: false})),
       news: [
@@ -344,6 +365,10 @@
   }
 
   function startGame() {
+    if(["prefeito","vereador"].includes(selectedOffice())) {
+      const elect=Number($("electorateChoice").value);
+      if(!Number.isSafeInteger(elect)||elect<1000||elect>15000000)return showToast("Informe eleitorado simulado entre 1.000 e 15 milhões");
+    }
     state = newState();
     previousNational = nationalSupport();
     $("setup").classList.add("hidden");
@@ -399,6 +424,7 @@
     state.debate = clamp(state.debate, 0, 100);
     state.integrity = clamp(state.integrity ?? 65, 0, 100);
     state.corruptionRisk = clamp(state.corruptionRisk ?? 0, 0, 100);
+    if(state.partyProfile){for(const k of Object.keys(state.partyProfile))state.partyProfile[k]=clamp(state.partyProfile[k],0,100);}
     state.investigation = clamp(state.investigation ?? 0, 0, 100);
     state.funds = Math.max(0, state.funds);
     state.regions.forEach(r => {
@@ -410,6 +436,7 @@
 
   function takeTurn() {
     if (state.finished || state.phase === "ended") { navTo("career"); return; }
+    if (state.pendingEvent !== null && state.pendingEvent !== undefined) { triggerEvent(events[state.pendingEvent],state.pendingEvent); return; }
     if (state.debateAvailable || state.pendingDebate) { navTo("debate"); showToast("Responda ao debate antes de avançar"); return; }
     if (state.phase === "government") return governmentTurn();
     if (state.phase === "runoff") return runoffElection();
@@ -428,9 +455,7 @@
       r.undecided = clamp(r.undecided - rnd(.2,.8), 3, 28);
     });
 
-    state.opponents.forEach((o, idx) => {
-      o.poll = clamp(o.poll + rnd(-.6,.8) + state.ai * rnd(0,.3), 8, 40);
-    });
+    advanceRivals();
 
     state.funds += 0.8 + state.ground / 160 + Math.max(0, state.reputation - 50) / 90;
     resolveIntegrityTurn();
@@ -445,7 +470,8 @@
     } else if (state.turns % 3 === 0) {
       // O antigo evento de debate de um único clique foi substituído pelos debates interativos.
       const others = events.filter(event => event.title !== "Debate televisionado");
-      triggerEvent(others[Math.floor(Math.random()*others.length)]);
+      const chosen=others[Math.floor(Math.random()*others.length)];
+      triggerEvent(chosen, events.indexOf(chosen));
     } else {
       addNews("Nova rodada de pesquisas", "Institutos registram pequenas oscilações após mais uma semana de campanha.");
     }
@@ -455,7 +481,10 @@
     if (scheduled) navTo("debate");
   }
 
-  function triggerEvent(event) {
+  function triggerEvent(event, eventIndex = events.indexOf(event)) {
+    if (!event) return;
+    state.pendingEvent = eventIndex;
+    writeSave(false);
     $("modalTitle").textContent = event.title;
     $("modalText").textContent = event.text;
     $("modalChoices").innerHTML = "";
@@ -464,6 +493,7 @@
       b.className = "choice-btn";
       b.innerHTML = `<strong>${choice.label}</strong><span>${choice.hint}</span>`;
       b.onclick = () => {
+        state.pendingEvent = null;
         choice.effect(state);
         normalize();
         $("modalBackdrop").classList.add("hidden");
@@ -472,6 +502,82 @@
       $("modalChoices").appendChild(b);
     });
     $("modalBackdrop").classList.remove("hidden");
+  }
+
+  function advanceRivals() {
+    state.rivalActivity ??= [];
+    const tactics = ["Visita regional", "Publicidade", "Entrevista", "Alianças locais", "Mobilização digital"];
+    for (const rival of state.opponents) {
+      rival.funds = (rival.funds ?? 12) + rnd(.6,1.6);
+      const tactic = Math.floor(Math.random()*tactics.length);
+      const boost = [rnd(.15,.5),rnd(.3,.7),rnd(-.25,.6),rnd(.1,.55),rnd(.15,.5)][tactic];
+      rival.poll = clamp(rival.poll + boost + state.ai*rnd(-.15,.2) - rnd(.15,.6),5,48);
+      rival.funds = Math.max(0,rival.funds - [1.3,2.5,0,.9,.8][tactic]);
+      rival.activity = tactics[tactic];
+      const item = {title:`${rival.name} — ação simulada`,text:`${tactics[tactic]} · ${rival.party}. Atividade criada pelo jogo; não é notícia real.`};
+      state.rivalActivity.unshift(item);
+    }
+    state.rivalActivity = state.rivalActivity.slice(0,9);
+  }
+
+  // Approximate proportional distribution: QE/QP, 10% QE individual minimum,
+  // 80% QE party and 20% QE candidate for early largest-average leftovers.
+  // Artificial totals and lists are for play; not an official TSE calculation.
+  function calculateProportional(share) {
+    const stateSize={SP:70,MG:53,RJ:46,BA:39,RS:31,PR:30,PE:25,CE:22,PA:17,SC:16,GO:17,MA:18,ES:10,DF:8};
+    const isCity=state.office==="vereador";
+    const seats=isCity ? clamp(Math.round((state.municipalityElectorate||150000)/50000)+9,9,55)
+      : state.office==="deputado_federal" ? (stateSize[state.stateUF]||8)
+      : clamp(Math.round((stateSize[state.stateUF]||8)*1.35)+12,24,94);
+    const validVotes=Math.round(isCity ? Math.max(1000,state.municipalityElectorate||150000)*.72 : 1200000);
+    const qe=Math.max(1,Math.round(validVotes/seats));
+    // The user's visible support is an individual preference proxy, NOT their party vote.
+    const partyIds=[state.party,'PT','PL','PSD','MDB','PSB','UNIÃO','REPUBLICANOS','PDT','NOVO']
+      .filter((x,i,a)=>a.indexOf(x)===i).slice(0,9);
+    const playerVoteShare=clamp(share,4,54);
+    const partyWeights=partyIds.map((p,i)=>i===0?clamp(10+playerVoteShare*.38,9,34):rnd(6,21));
+    const wsum=partyWeights.reduce((a,b)=>a+b,0);
+    const parties=partyIds.map((id,i)=>{
+      const totalVotes=Math.round(validVotes*partyWeights[i]/wsum);
+      const listSize=Math.max(12,Math.ceil(seats*.35));
+      const raw=Array.from({length:listSize},(_,j)=>rnd(.35,2.8)/Math.sqrt(j+1));
+      if(i===0) raw[0]=clamp(playerVoteShare/20, .45, 3.1);
+      const sw=raw.reduce((a,b)=>a+b,0);
+      const members=raw.map((x,j)=>({name:i===0&&j===0?state.candidate:`Candidato fictício ${j+1} (${id})`,votes:Math.floor(totalVotes*x/sw)}));
+      // Deterministically adjust rounding to conserve the simulated party vote total
+      members[0].votes+=totalVotes-members.reduce((a,c)=>a+c.votes,0);
+      members.sort((a,b)=>b.votes-a.votes);
+      return {id,votes:totalVotes,members,seats:0,winners:[]};
+    });
+    let distributed=0;
+    for(const p of parties){
+      const earned=Math.floor(p.votes/qe);
+      const eligible=p.members.filter(c=>c.votes>=.10*qe);
+      p.seats=Math.min(earned,eligible.length);
+      p.winners=eligible.slice(0,p.seats);
+      distributed+=p.seats;
+    }
+    while(distributed<seats){
+      // Progressive eligibility relaxation after the first remainder pass.
+      let eligible=parties.filter(p=>p.votes>=.8*qe && p.members.some(c=> !p.winners.includes(c) && c.votes>=.2*qe));
+      if(!eligible.length) eligible=parties.filter(p=>p.members.some(c=>!p.winners.includes(c) && c.votes>=.1*qe));
+      if(!eligible.length) break;
+      eligible.sort((a,b)=>b.votes/(b.seats+1)-a.votes/(a.seats+1));
+      const p=eligible[0];
+      const candidate=p.members.find(c=>!p.winners.includes(c) && c.votes>=(p.votes>=.8*qe?.2:.1)*qe);
+      if(!candidate)break;
+      p.winners.push(candidate);p.seats++;distributed++;
+    }
+    const own=parties[0];
+    const player=own.members.find(c=>c.name===state.candidate);
+    return {elected:own.winners.some(c=>c.name===state.candidate),seats,qe,votes:player?.votes||0,
+      partyVotes:own.votes,partySeats:own.seats,party:own.id,validVotes,
+      details:parties.map(p=>({party:p.id,seats:p.seats,votes:p.votes}))};
+  }
+
+  function hasRunoff() {
+    if(state.office==="presidente"||state.office==="governador")return true;
+    return state.office==="prefeito" && Number(state.municipalityElectorate||0)>200000;
   }
 
   function election() {
@@ -483,16 +589,23 @@
     estimates.forEach(c => c.votes = round1(100*Math.max(c.votes,1)/total));
     estimates.sort((a,b)=>b.votes-a.votes);
     state.electionHistory = state.electionHistory || [];
-    state.electionHistory.push({round:1,office:state.office,district:state.district,campaign:state.campaignNumber,results:estimates});
+    state.electionHistory.push({round:1,office:state.office,district:state.district,year:state.electionYear,campaign:state.campaignNumber,results:estimates});
     state.week=0;
-    if (legislativeOffices.has(state.office)) {
-      // Modelo simplificado de eleição legislativa. Eleições proporcionais reais também dependem de votação partidária e quocientes.
-      const own=estimates.find(c=>c.name===state.candidate);
-      const elected=state.office==="senador" ? estimates[0].name===state.candidate : own.votes>=15;
-      return concludeElection(elected,own.votes,1);
+    const own=estimates.find(c=>c.name===state.candidate);
+    if (["deputado_federal","deputado_estadual","vereador"].includes(state.office)) {
+      const result=calculateProportional(own.votes);
+      state.lastElection={...result,kind:"proportional",office:state.office};
+      addNews("Apuração proporcional simulada",`${result.party}: ${result.partySeats} de ${result.seats} cadeiras; QE simulado de ${result.qe.toLocaleString("pt-BR")} votos.`);
+      return concludeElection(result.elected,round1(result.votes/result.validVotes*100),1);
     }
-    if (state.office==="prefeito" && state.electorateSmall) return concludeElection(estimates[0].name===state.candidate,estimates.find(c=>c.name===state.candidate).votes,1);
-    if (estimates[0].votes>50) return concludeElection(estimates[0].name === state.candidate,estimates[0].votes,1);
+    if (state.office==="senador") {
+      // In alternating general elections, the simulated state elects two or one senators.
+      const seats = ((state.electionYear-2026)%8===0)?2:1;
+      state.lastElection={kind:"senate",seats};
+      return concludeElection(estimates.slice(0,seats).some(c=>c.name===state.candidate),own.votes,1);
+    }
+    if (!hasRunoff()) return concludeElection(estimates[0].name===state.candidate,own.votes,1);
+    if (estimates[0].votes>50) return concludeElection(estimates[0].name === state.candidate,own.votes,1);
     const finalist=estimates.slice(0,2);
     if(!finalist.some(c=>c.name===state.candidate)) return concludeElection(false,estimates.find(c=>c.name===state.candidate).votes,1);
     state.phase="runoff";
@@ -515,7 +628,7 @@
       renderAll(); return;
     }
     const share=clamp(state.runoffBase+(state.reputation-50)/30+state.media/22+rnd(-2,2),15,85);
-    state.electionHistory.push({round:2,office:state.office,district:state.district,campaign:state.campaignNumber,results:[{name:state.candidate,votes:round1(share)},{name:state.runoffRival,votes:round1(100-share)}]});
+    state.electionHistory.push({round:2,office:state.office,district:state.district,year:state.electionYear,campaign:state.campaignNumber,results:[{name:state.candidate,votes:round1(share)},{name:state.runoffRival,votes:round1(100-share)}]});
     concludeElection(share>50,share,2);
   }
 
@@ -531,81 +644,114 @@
   function concludeElection(won,percent,round) {
     state.week=0;
     state.careerHistory ??= [];
+    state.lastElection ??= {kind:"majoritarian"};
     if(won) {
       state.careerHistory.push({kind:"mandate", office:state.office,district:state.district,party:state.party,
         result:"eleito",status:"em curso",months:1,total:state.office==="senador"?96:48,
-        approval:round1(state.reputation+5),vote:round1(percent),round,election:state.campaignNumber});
+        approval:round1(state.reputation+5),vote:round1(percent),round,election:state.campaignNumber,year:state.electionYear,apportionment:state.lastElection?.kind==="proportional"?{...state.lastElection}:null});
       state.phase="government";
       state.administration={month:1,maxMonths:(state.office==="senador"?96:48),approval:clamp(state.reputation+5,30,80),congress:46,
         inflation:5.8,unemployment:8.4,gdp:1.6,debt:74,health:48,education:49,security:45,
         budget:80,coalition:0,policies:[],history:[]};
       state.energy=3;
       addNews("Posse fictícia",`Eleição para ${officeNames[state.office]} em ${state.district}: ${round1(percent)}% no ${round}º turno. Começa o mandato.`);
-      showDecision("Eleição vencida",`Você obteve ${round1(percent)}% dos votos na simulação e foi eleito para ${officeNames[state.office]} (${state.district}). Começa o seu mandato.`,"Assumir mandato",()=>navTo("government"));
+      showDecision("Eleição vencida",state.lastElection?.kind==="proportional" ? `Você foi eleito(a) pela distribuição proporcional simulada. ${state.party} conquistou ${state.lastElection.partySeats} de ${state.lastElection.seats} cadeiras; sua votação nominal simulada foi de ${state.lastElection.votes.toLocaleString("pt-BR")} votos.` : `Você obteve ${round1(percent)}% dos votos na simulação e foi eleito para ${officeNames[state.office]} (${state.district}). Começa o seu mandato.`,"Assumir mandato",()=>navTo("government"));
     } else {
       state.phase="ended"; state.finished=true;
       state.careerHistory.push({kind:"election",office:state.office,district:state.district,party:state.party,
-        result:"não eleito",vote:round1(percent),round,election:state.campaignNumber});
-      showDecision("Derrota eleitoral",`Sua candidatura terminou com ${round1(percent)}% no ${round}º turno da eleição simulada.`,"Ver resultados",()=>navTo("overview"));
+        result:"não eleito",vote:round1(percent),round,election:state.campaignNumber,year:state.electionYear,apportionment:state.lastElection?.kind==="proportional"?{...state.lastElection}:null});
+      showDecision("Derrota eleitoral",state.lastElection?.kind==="proportional" ? `Você não obteve uma das cadeiras na distribuição proporcional simulada. Sua votação nominal simulada foi de ${state.lastElection.votes.toLocaleString("pt-BR")} votos.` : `Sua candidatura terminou com ${round1(percent)}% no ${round}º turno da eleição simulada.`,"Ver resultados",()=>navTo("overview"));
     }
     renderAll();
   }
 
-  const policyDefs=[
-    {id:"health",title:"Expandir atenção básica",desc:"Melhora saúde, requer orçamento.",cost:9,congress:2,approval:2,health:8,debt:1.1},
-    {id:"education",title:"Investir na educação",desc:"Amplia escolas e qualificação.",cost:8,congress:1,approval:2,education:8,debt:0.8},
-    {id:"security",title:"Programa integrado de segurança",desc:"Coordenação e prevenção.",cost:7,congress:1,approval:1,security:8,debt:0.5},
-    {id:"tax",title:"Reforma tributária",desc:"Melhora arrecadação, exige base parlamentar.",cost:2,congress:-6,approval:-1,debt:-2,gdp:.4},
-    {id:"jobs",title:"Plano de emprego e infraestrutura",desc:"Gera empregos com custo fiscal.",cost:12,congress:1,approval:2,unemployment:-.7,gdp:.6,debt:1.3},
-    {id:"austerity",title:"Ajuste fiscal",desc:"Reduz dívida, mas provoca desgaste.",cost:0,congress:-3,approval:-4,debt:-3,inflation:-.3,gdp:-.3}
+  const policyDefs = [
+    {id:"health",title:"Expandir atenção básica",desc:"Aprimora a rede de saúde na esfera de governo",cost:9,congress:2,approval:2,health:8,debt:.8,for:["presidente","governador","prefeito"]},
+    {id:"education",title:"Programa educacional",desc:"Financiamento e monitoramento da rede de ensino",cost:8,congress:1,approval:2,education:8,debt:.7,for:["presidente","governador","prefeito"]},
+    {id:"security",title:"Plano de segurança integrada",desc:"Coordenação institucional e prevenção",cost:7,congress:1,approval:1,security:8,debt:.5,for:["presidente","governador"]},
+    {id:"tax",title:"Reforma tributária federal",desc:"Política tributária dependente de aprovação legislativa",cost:2,congress:-5,approval:-1,debt:-2,gdp:.4,for:["presidente"]},
+    {id:"jobs",title:"Emprego e infraestrutura",desc:"Investimento público com custo fiscal",cost:12,congress:1,approval:2,unemployment:-.7,gdp:.6,debt:1.3,for:["presidente","governador"]},
+    {id:"transport",title:"Melhorar transporte municipal",desc:"Mobilidade, rotas e manutenção urbana",cost:7,congress:2,approval:3,security:2,for:["prefeito"]},
+    {id:"sanitation",title:"Saneamento e limpeza urbana",desc:"Contratos, fiscalização e serviços locais",cost:9,congress:1,approval:3,health:5,for:["prefeito"]},
+    {id:"localtax",title:"Revisão tributária municipal",desc:"Requer proposta aprovada pela Câmara Municipal",cost:1,congress:-4,approval:-1,debt:-1,for:["prefeito"]},
+    {id:"fiscal",title:"Plano de equilíbrio fiscal",desc:"Reduz gasto e dívida, pode diminuir aprovação",cost:0,congress:-3,approval:-3,debt:-2,for:["presidente","governador","prefeito"]},
+    {id:"leg_health",title:"Projeto de lei sobre transparência na saúde",desc:"Propõe regras gerais e fiscalização, sem gerir hospitais",cost:1,congress:2,approval:1,health:2,for:["senador","deputado_federal","deputado_estadual","vereador"]},
+    {id:"leg_edu",title:"Projeto de lei de acompanhamento da educação",desc:"Tramitação em comissões e votação",cost:1,congress:1,approval:1,education:2,for:["senador","deputado_federal","deputado_estadual","vereador"]},
+    {id:"leg_control",title:"Requerimento de fiscalização",desc:"Instrumentos de controle conforme esfera parlamentar",cost:0,congress:-1,approval:2,integrity:3,for:["senador","deputado_federal","deputado_estadual","vereador"]},
+    {id:"leg_budget",title:"Debater diretrizes orçamentárias",desc:"Proposta ou emenda, sem autorizar despesas executivas",cost:1,congress:0,approval:1,for:["senador","deputado_federal","deputado_estadual","vereador"]},
   ];
+  const chamberNames={presidente:"Congresso Nacional",governador:"Assembleia Legislativa",prefeito:"Câmara Municipal",senador:"Senado Federal",deputado_federal:"Câmara dos Deputados",deputado_estadual:"Assembleia Legislativa",vereador:"Câmara Municipal"};
   function governmentPolicy(id){
     const g=state?.administration,p=policyDefs.find(x=>x.id===id);
-    if(!g || !p || state.energy<1 || g.budget<p.cost)return showToast("Ações ou orçamento insuficientes");
+    if(!g||!p||!p.for.includes(state.office))return;
+    if(state.energy<1||g.budget<p.cost)return showToast("Ações ou orçamento insuficientes");
     state.energy--;g.budget-=p.cost;
-    const votes=clamp(g.congress+g.coalition+rnd(-12,12),0,100);
-    if(votes<50){g.approval-=1;addNews("Projeto rejeitado no Congresso",`A proposta “${p.title}” não obteve votos suficientes (${Math.round(votes)}% de apoio).`);renderAll();return;}
-    for(const [key,val] of Object.entries(p))if(typeof val==="number"&&key!=="cost"&&key!=="congress")g[key]=(g[key]||0)+val;
+    const isLeg=legislativeOffices.has(state.office);
+    const votes=clamp(g.congress+g.coalition+rnd(-15,15),0,100);
+    // A legislature approves or rejects the player's bill; an executive requests legislative support.
+    if(votes<50){g.approval-=1;addNews(isLeg?"Projeto não aprovado":"Proposta rejeitada",`“${p.title}” recebeu ${Math.round(votes)}% do apoio simulado no(a) ${chamberNames[state.office]}.`);renderAll();return;}
+    for(const [key,val] of Object.entries(p))if(typeof val==="number"&&key!=="cost"&&key!=="congress") {
+      if(key==="integrity")state.integrity+=val;
+      else g[key]=(g[key]||0)+val;
+    }
     g.congress=clamp(g.congress+p.congress,0,100);
-    g.policies.push({month:g.month,title:p.title,votes:Math.round(votes)});
-    addNews("Projeto aprovado",`${p.title}: aprovado com ${Math.round(votes)}% de apoio simulado no Congresso.`);
-    renderAll();
+    g.policies.push({month:g.month,title:p.title,votes:Math.round(votes),kind:isLeg?"projeto legislativo":"política executiva"});
+    addNews(isLeg?"Projeto legislativo aprovado":"Política pública aprovada",`${p.title}: ${Math.round(votes)}% do apoio simulado no(a) ${chamberNames[state.office]}.`);
+    normalize();renderAll();
   }
   function cabinetAction(type){
-    const g=state?.administration;if(!g || state.energy<1)return;
+    const g=state?.administration;if(!g||state.energy<1||state.finished)return;
     state.energy--;
-    if(type==="coalition") {g.coalition=clamp(g.coalition+7,0,25);g.congress=clamp(g.congress+3,0,100);g.approval-=1;addNews("Acordo parlamentar fictício","A base de sustentação do governo aumenta.");}
-    if(type==="transparent") {state.integrity=clamp(state.integrity+9,0,100);state.corruptionRisk=clamp(state.corruptionRisk-10,0,100);g.approval+=2;addNews("Portal de transparência","Controle social e fiscalização administrativa reforçados.");}
-    if(type==="communicate") {g.approval+=2;g.budget=Math.max(0,g.budget-2);addNews("Prestação de contas","Governo apresentou resultados e desafios à população.");}
+    const leg=legislativeOffices.has(state.office);
+    if(type==="coalition") {g.coalition=clamp(g.coalition+7,0,25);g.congress=clamp(g.congress+3,0,100);g.approval-=1;addNews(leg?"Articulação de bancada":"Articulação de governo","Apoio legislativo da simulação aumentou.");}
+    if(type==="transparent") {state.integrity=clamp(state.integrity+9,0,100);state.corruptionRisk=clamp(state.corruptionRisk-10,0,100);g.approval+=2;addNews("Transparência pública","Fiscalização e controle administrativo reforçados.");}
+    if(type==="communicate") {g.approval+=1.5;g.budget=Math.max(0,g.budget-2);addNews("Prestação de contas","Resultados e limites institucionais apresentados à população.");}
     normalize();renderAll();
   }
   function governmentTurn(){
-    const g=state.administration;if(!g || state.finished)return;
-    const shock=rnd(-1,1);g.approval=clamp(g.approval+shock+(g.gdp-1.5)/4-(g.inflation-5)/6-(g.unemployment-8)/5-(state.investigation||0)/125,0,100);
-    g.inflation=clamp(g.inflation+rnd(-.4,.45),0,30);g.unemployment=clamp(g.unemployment+rnd(-.3,.3),1,30);
-    g.gdp=clamp(g.gdp+rnd(-.2,.2),-8,12);g.debt=clamp(g.debt+(.15+(g.inflation-5)/70),0,160);
-    g.budget+=7;g.congress=clamp(g.congress+rnd(-2,2),0,100);
+    const g=state.administration;if(!g||state.finished)return;
+    const executive=executiveOffices.has(state.office);
+    const shock=rnd(-1.3,1.3);
+    g.approval=clamp(g.approval+shock+(executive?(g.gdp-1.5)/4-(g.inflation-5)/6-(g.unemployment-8)/5:0)-(state.investigation||0)/125,0,100);
+    if(executive){
+      g.inflation=clamp(g.inflation+rnd(-.4,.45),0,30);g.unemployment=clamp(g.unemployment+rnd(-.3,.3),1,30);
+      g.gdp=clamp(g.gdp+rnd(-.2,.2),-8,12);g.debt=clamp(g.debt+(.15+(g.inflation-5)/70),0,160);
+    }
+    g.budget+=executive?7:1.6;
+    g.congress=clamp(g.congress+rnd(-2,2),0,100);
     resolveIntegrityTurn();g.history.push({month:g.month,approval:round1(g.approval),inflation:round1(g.inflation)});
+    const rec=[...(state.careerHistory||[])].reverse().find(h=>h.kind==="mandate"&&h.status==="em curso");
+    if(rec){rec.approval=round1(g.approval);rec.months=g.month;rec.policies=g.policies.length;}
     if(g.month>=g.maxMonths){
       state.finished=true;state.phase="ended";
       closeCareerMandate("concluído");
-      showDecision("Fim do mandato",`Aprovação final de ${round1(g.approval)}%. Você aprovou ${g.policies.length} projetos. Sua carreira continua: dispute uma nova eleição para qualquer cargo.`,"Abrir carreira",()=>navTo("career"));
-    }
-    else {g.month++;state.energy=3;addNews("Novo mês de governo",`Mês ${g.month} de ${g.maxMonths}: inflação ${round1(g.inflation)}%, desemprego ${round1(g.unemployment)}%.`);}
+      showDecision("Fim do mandato",`Aprovação final de ${round1(g.approval)}%. Você aprovou ${g.policies.length} propostas. Sua carreira continua: dispute uma nova eleição.`,"Abrir carreira",()=>navTo("career"));
+    } else {g.month++;state.energy=3;addNews("Novo mês de mandato",`Mês ${g.month} de ${g.maxMonths}: aprovação ${round1(g.approval)}% e ${g.policies.length} propostas aprovadas.`);}
     renderAll();
   }
   function renderGovernment(){
     const el=$("governmentContent");if(!el)return;
     const g=state.administration;
-    if(!g){el.innerHTML=`<div class="panel">Vença a eleição para ${officeNames[state.office]||"o cargo escolhido"} e assuma seu mandato em ${state.district||"seu território"}.</div>`;return;}
+    if(!g){el.innerHTML=`<div class="panel">Vença a eleição para ${officeNames[state.office]||"o cargo escolhido"} para assumir seu mandato em ${safeText(state.district||"seu território")}.</div>`;return;}
+    const executive=executiveOffices.has(state.office);
     const metric=(name,v,unit="")=>`<div class="metric-card"><span>${name}</span><strong>${round1(v)}${unit}</strong></div>`;
-    el.innerHTML=`<div class="metric-grid" style="margin-top:0">
-      ${metric("Aprovação",g.approval,"%")}${metric("Inflação (simulada)",g.inflation,"%")}${metric("Desemprego (simulado)",g.unemployment,"%")}${metric("PIB (crescimento simulado)",g.gdp,"%")}
-      ${metric("Dívida pública/PIB (simulada)",g.debt,"%")}${metric("Apoio legislativo",g.congress+g.coalition,"%")}${metric("Orçamento do mandato",g.budget," bi")}${metric("Mês de mandato",g.month,` / ${g.maxMonths}`)}
-    </div>
-    <div class="panel" style="margin-top:14px"><h3>Políticas públicas</h3><p>Votações simuladas dependem da força da base parlamentar. Cada proposta custa 1 ação.</p><div class="action-grid">${policyDefs.map(p=>`<div class="action-card"><div><h4>${p.title}</h4><p>${p.desc} Custo: ${p.cost} bilhões fictícios.</p></div><button class="btn btn-primary" ${state.energy<1||g.budget<p.cost||state.finished?'disabled':''} onclick="window.__game.governmentPolicy('${p.id}')">Propor</button></div>`).join('')}</div></div>
-    <div class="panel" style="margin-top:14px"><h3>Próxima etapa da carreira</h3><p>Você pode disputar outro cargo e escolher um novo estado ou município sem apagar o histórico de conquistas. Iniciar a nova campanha encerra o mandato atual nesta simulação.</p><button class="btn btn-primary" onclick="window.__game.openCareer()">Escolher próxima eleição</button></div>
-    <div class="panel" style="margin-top:14px"><h3>Gabinete e governabilidade</h3><div class="card-actions"><button class="btn" onclick="window.__game.cabinetAction('coalition')" ${state.energy<1||state.finished?'disabled':''}>Negociar base</button><button class="btn" onclick="window.__game.cabinetAction('transparent')" ${state.energy<1||state.finished?'disabled':''}>Fiscalização e transparência</button><button class="btn" onclick="window.__game.cabinetAction('communicate')" ${state.energy<1||state.finished?'disabled':''}>Prestar contas</button></div><p>Projetos aprovados: ${g.policies.length} • Saúde ${Math.round(g.health)} • Educação ${Math.round(g.education)} • Segurança ${Math.round(g.security)}</p></div>`;
+    const cards=executive?
+      metric(state.office==="presidente"?"Inflação nacional simulada":"Pressão de preços simulada",g.inflation,"%")+
+      metric(state.office==="prefeito"?"Desemprego municipal simulado":"Desemprego simulado",g.unemployment,"%")+
+      metric("Atividade econômica simulada",g.gdp,"%")+metric("Dívida pública simulada",g.debt,"%"):
+      metric("Propostas aprovadas",g.policies.length)+metric("Tramitação/apoio",g.congress+g.coalition,"%")+
+      metric("Fiscalização e controle",state.integrity,"/100")+metric("Propostas analisadas",g.history.length);
+    const allowed=policyDefs.filter(p=>p.for.includes(state.office));
+    el.innerHTML=`<div class="panel"><p class="eyebrow">${executive?"PODER EXECUTIVO":"PODER LEGISLATIVO"}</p><h3>${officeNames[state.office]} · ${safeText(state.district)}</h3>
+      <p>${executive?"Você administra serviços e propõe políticas dentro da esfera do cargo. Projetos que exigem lei dependem do Legislativo.":"Você legisla, vota, debate políticas e fiscaliza. Não pode executar diretamente o orçamento do Poder Executivo."} Cenário institucional e valores fictícios.</p></div>
+      <div class="metric-grid">${metric("Aprovação",g.approval,"%")}${cards}${metric(executive?"Orçamento executivo simulado":"Recursos parlamentares operacionais",g.budget," u.")}${metric("Mês de mandato",g.month,` / ${g.maxMonths}`)}</div>
+      <div class="panel" style="margin-top:14px"><h3>${executive?"Políticas do governo":"Projetos e fiscalização"}</h3><p>${chamberNames[state.office]} · 1 ação por medida.</p>
+      <div class="action-grid">${allowed.map(p=>`<div class="action-card"><div><h4>${p.title}</h4><p>${p.desc} Custo operacional simulado: ${p.cost} u.</p></div><button class="btn btn-primary" ${state.energy<1||g.budget<p.cost||state.finished?'disabled':''} onclick="window.__game.governmentPolicy('${p.id}')">${executive?"Propor":"Protocolar"}</button></div>`).join('')}</div></div>
+      <div class="panel" style="margin-top:14px"><h3>Carreira política</h3><p>Você pode disputar outra eleição. O histórico do cargo atual será preservado.</p><button class="btn btn-primary" onclick="window.__game.openCareer()">Escolher próximo cargo</button></div>
+      <div class="panel" style="margin-top:14px"><h3>${executive?"Gabinete e governabilidade":"Atuação parlamentar"}</h3><div class="card-actions">
+      <button class="btn" onclick="window.__game.cabinetAction('coalition')" ${state.energy<1||state.finished||state.phase==="government"?'disabled':''}>${executive?"Negociar base":"Articular bancada"}</button>
+      <button class="btn" onclick="window.__game.cabinetAction('transparent')" ${state.energy<1||state.finished||state.phase==="government"?'disabled':''}>Transparência</button>
+      <button class="btn" onclick="window.__game.cabinetAction('communicate')" ${state.energy<1||state.finished||state.phase==="government"?'disabled':''}>Prestação de contas</button></div><p>Propostas aprovadas: ${g.policies.length} · Saúde ${Math.round(g.health)} · Educação ${Math.round(g.education)} · Segurança ${Math.round(g.security)}</p></div>`;
   }
 
   function chooseProposal(proposalId, optionId) {
@@ -639,7 +785,7 @@
 
     state.energy--;
     state.funds -= c.cost;
-    const gain = rnd(18, 34) + state.reputation / 15;
+    const gain = rnd(18, 34) + state.reputation / 15 + ((state.partyProfile?.cohesion||50)-50)/8;
     c.progress = clamp(c.progress + gain, 0, 100);
 
     if (c.progress >= 100) {
@@ -676,7 +822,7 @@
     const delta = nat - previousNational;
 
     $("candidateTitle").textContent = state.candidate;
-    $("candidateSubtitle").textContent = `${state.party} · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"} · ${ideologyLabel(state.ideology)}`;
+    $("candidateSubtitle").textContent = `${state.party} · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"} · Eleição ${state.electionYear} · ${ideologyLabel(state.ideology)}`;
     $("nationalPoll").textContent = `${round1(nat)}%`;
     $("fundsMetric").textContent = money(state.funds);
     $("reputationMetric").textContent = Math.round(state.reputation);
@@ -701,6 +847,9 @@
     renderGovernment();
     renderCareer();
     renderDebate();
+    renderBrazilMap();
+    const rivalPanel=$("rivalActivity");
+    if(rivalPanel)rivalPanel.innerHTML=(state.rivalActivity||[]).length?(state.rivalActivity||[]).slice(0,6).map(x=>`<div class="news-item"><strong>${safeText(x.title)}</strong><p>${safeText(x.text)}</p></div>`).join(""):`<p class="muted-text">A atividade dos adversários aparecerá após a primeira semana.</p>`;
     $("pollLabel").textContent = state.phase === "government" ? "Apoio da última campanha" : "Intenção de voto simulada";
     $("pollRaceTitle").textContent = `Disputa: ${officeNames[state.office]||"Presidente"}`;
     $("nextTurn").textContent=state.phase==="ended"?"Disputar outra eleição":(state.debateAvailable||state.pendingDebate)?"Participar do debate":state.phase==="government"?"Avançar um mês":state.phase==="runoff"?"Avançar segundo turno":"Avançar uma semana";
@@ -713,15 +862,16 @@
       ...state.opponents.map(o => ({name:o.name, poll:o.poll, you:false}))
     ].sort((a,b) => b.poll-a.poll);
 
+    const sum=candidates.reduce((total,c)=>total+Math.max(.01,c.poll),0);
     $("pollBars").innerHTML = candidates.map(c => `
       <div class="poll-row ${c.you ? "you" : ""}">
-        <div class="poll-label"><span>${c.name}</span><strong>${round1(c.poll)}%</strong></div>
-        <div class="poll-track"><div class="poll-fill" style="width:${clamp(c.poll*2.2, 3, 100)}%"></div></div>
+        <div class="poll-label"><span>${safeText(c.name)}</span><strong>${round1(c.poll/sum*100)}%</strong></div>
+        <div class="poll-track"><div class="poll-fill" style="width:${clamp(c.poll/sum*210, 3, 100)}%"></div></div>
       </div>`).join("");
   }
 
   function renderIssues() {
-    const dynamic = [...issues].map((x,i) => ({...x, weight: x.weight + rnd(-1.2,1.2)})).sort((a,b) => b.weight-a.weight);
+    const dynamic = [...issues].sort((a,b) => b.weight-a.weight);
     $("issueList").innerHTML = dynamic.map((x,i) => `
       <div class="issue">
         <div class="issue-rank">${i+1}</div>
@@ -731,16 +881,63 @@
 
   function renderNews() {
     $("newsFeed").innerHTML = state.news.map(n => `
-      <div class="news-item"><strong>${n.title}</strong><p>${n.text}</p></div>`).join("");
+      <div class="news-item"><strong>${safeText(n.title)}</strong><p>${safeText(n.text)}</p></div>`).join("");
   }
+
+  // 27-state map. Offline-safe selectable cartogram; if optional GeoJSON loads,
+  // draw actual boundaries using an equirectangular projection (no external JS library).
+  const ufGrid={AC:[1,6],AM:[2,4],RR:[3,1],RO:[3,6],PA:[5,3],AP:[7,1],TO:[6,6],MA:[8,4],PI:[9,5],CE:[11,4],RN:[13,4],PB:[13,5],PE:[12,6],AL:[13,7],SE:[13,8],BA:[10,8],MT:[5,7],MS:[5,10],GO:[7,9],DF:[8,9],MG:[9,11],ES:[11,11],RJ:[10,12],SP:[8,12],PR:[7,13],SC:[7,14],RS:[6,15]};
+  let geoFeatures = null, geoStarted = false;
+  function locateRegion(id) {
+    const node=document.getElementById(`region-${id}`);
+    if(node){node.scrollIntoView({behavior:"smooth",block:"center"});node.classList.add("region-highlight");setTimeout(()=>node.classList.remove("region-highlight"),1600);}
+  }
+  function renderBrazilMap() {
+    const el=$("brazilMap");if(!el||!state)return;
+    if(state.office!=="presidente"){
+      el.innerHTML=`<p class="muted-text">A candidatura atual abrange ${safeText(state.district)}. O mapa nacional ficará disponível para campanhas presidenciais.</p>`;
+      $("mapSource").textContent="Circunscrição: "+state.district;return;
+    }
+    const geo=geoFeatures;
+    if(geo && geo.length){
+      const project=(lon,lat)=>[(lon+75)*12, (7-lat)*12];
+      const toPath=(coords)=>coords.map(ring=>ring.map((pt,i)=>`${i?'L':'M'}${project(pt[0],pt[1]).map(n=>n.toFixed(1)).join(' ')}`).join(' ')+' Z').join(' ');
+      const paths=geo.map(f=>{
+        const uf=f.properties?.sigla||f.properties?.uf;
+        const region=state.regions.find(r=>r.uf===uf);
+        if(!region)return '';
+        let rings=[];
+        if(f.geometry.type==="Polygon")rings=f.geometry.coordinates;
+        else if(f.geometry.type==="MultiPolygon")rings=f.geometry.coordinates.flatMap(poly=>poly);
+        return `<path class="state-shape" data-uf="${uf}" data-region="${region.id}" d="${toPath(rings)}" fill="${colorSupport(region.support)}"><title>${safeText(region.name)} · ${round1(region.support)}% simulado</title></path>`;
+      }).join('');
+      el.innerHTML=`<svg viewBox="0 0 560 520" role="img" aria-label="Mapa de limites estaduais do Brasil, valores eleitorais simulados">${paths}</svg>`;
+      $("mapSource").textContent="Malha estadual (IBGE / CC0)";
+    }else{
+      el.innerHTML=`<div class="map-grid" role="group" aria-label="Mapa esquemático clicável">${state.regions.map(r=>{
+        const [x,y]=ufGrid[r.uf]||[1,1];
+        return `<button class="map-tile" style="grid-column:${x};grid-row:${y};background:${colorSupport(r.support)}" data-region="${r.id}" title="${safeText(r.name)}: ${round1(r.support)}% simulados">${r.uf}</button>`;
+      }).join("")}</div>`;
+      $("mapSource").textContent="Mapa esquemático (offline)";
+    }
+    el.querySelectorAll('[data-region]').forEach(node=>{node.onclick=()=>locateRegion(node.dataset.region);});
+    if(!geoStarted && typeof fetch==="function"){
+      geoStarted=true;
+      fetch('https://cdn.jsdelivr.net/gh/henriquemalvar/br-geojson@main/dist/estados.geojson')
+        .then(res=>{if(!res.ok)throw Error('geodata unavailable');return res.json()})
+        .then(data=>{if(data.type==="FeatureCollection" && Array.isArray(data.features)&&data.features.length>=27){geoFeatures=data.features;renderBrazilMap();}})
+        .catch(()=>{});
+    }
+  }
+  function colorSupport(v){const n=clamp((v-10)/42,0,1);return `hsl(${165-n*95} 44% ${28+n*18}%)`;}
 
   function renderRegions() {
     $("regionGrid").innerHTML = state.regions.map(r => `
-      <div class="region-card">
+      <div class="region-card" id="region-${r.id}">
         <div class="card-top">
           <div>
-            <h4>${r.name}</h4>
-            <p>Tema dominante: ${r.issue}</p>
+            <h4>${safeText(r.name)}</h4>
+            <p>Tema dominante: ${safeText(r.issue)}</p>
           </div>
           <div class="big-number">${round1(r.support)}%</div>
         </div>
@@ -822,7 +1019,36 @@
     </div>`;
   }
 
+  function partyAction(id){
+    if(!state || state.finished || !["campaign","runoff"].includes(state.phase))return;
+    if(state.energy<1)return showToast("Sem ações para esta semana");
+    const costs={organization:.9,convention:1.1,compliance:.7};
+    if(!(id in costs)||state.funds<costs[id])return showToast("Caixa insuficiente");
+    state.energy--;state.funds-=costs[id];
+    const party=state.partyProfile;
+    if(id==="organization"){
+      party.organization+=7;state.ground+=3.2;
+      state.regions.forEach(r=>r.organization+=1.6);
+      addNews("Diretórios se organizam",`Equipe de ${state.party} ampliou a rede fictícia de voluntários.`);
+    }else if(id==="convention"){
+      party.cohesion+=9;state.reputation+=.5;state.media+=.4;
+      addNews("Convenção partidária simulada",`A campanha fortaleceu a coordenação interna de ${state.party}.`);
+    }else if(id==="compliance"){
+      party.compliance+=11;state.integrity+=6;state.corruptionRisk-=5;
+      addNews("Controle financeiro partidário",`Auditoria interna fictícia reforça governança e documentação das despesas.`);
+    }
+    normalize();renderAll();
+  }
+
   function renderCoalitions() {
+    const party=state.partyProfile||newPartyProfile(state.party);
+    const partyPanel=$('partyPanel');
+    if(partyPanel)partyPanel.innerHTML=`<div class="panel"><p class="eyebrow">DIRETÓRIO PARTIDÁRIO FICTÍCIO</p><h3>${safeText(state.party)} · Organização interna</h3>
+      <p class="muted-text">Atributos gerados para o jogo, sem retratar características reais da legenda.</p>
+      <div class="party-bars">${progress("Organização",party.organization)}${progress("Coesão",party.cohesion)}${progress("Controle de contas",party.compliance)}${progress("Formação de quadros",party.development)}</div>
+      <div class="card-actions"><button class="btn" onclick="window.__game.partyAction('organization')" ${state.energy<1||state.funds<.9||state.finished||state.phase==='government'?'disabled':''}>Organizar diretórios · R$ 0,9 mi</button>
+      <button class="btn" onclick="window.__game.partyAction('convention')" ${state.energy<1||state.funds<1.1||state.finished||state.phase==='government'?'disabled':''}>Convenção · R$ 1,1 mi</button>
+      <button class="btn" onclick="window.__game.partyAction('compliance')" ${state.energy<1||state.funds<.7||state.finished||state.phase==='government'?'disabled':''}>Auditar partido · R$ 0,7 mi</button></div></div>`;
     $("coalitionGrid").innerHTML = state.coalitions.map(c => `
       <div class="coalition-card">
         <div class="card-top">
@@ -840,7 +1066,7 @@
 
   // Corrupção é mecânica de jogo inteiramente ficcional: NÃO descreve os partidos reais.
   function integrityAction(kind) {
-    if (!state || state.finished) return;
+    if (!state || state.finished || !["campaign","runoff"].includes(state.phase)) return showToast("Durante o mandato, use as medidas de fiscalização do gabinete");
     if (state.energy < 1) return showToast("Sem pontos de agenda");
     if (kind === "audit" && state.funds < .8) return showToast("Caixa insuficiente");
     if (kind === "reject") {
@@ -890,9 +1116,9 @@
         <div class="metric-card"><span>Recursos ilícitos simulados</span><strong>${money(state.illicitFunds||0)}</strong><small>não representa fato real</small></div>
       </div>
       <div class="action-grid" style="margin-top:16px">
-        <div class="action-card"><div><h4>Rejeitar oferta irregular</h4><p>Um personagem fictício oferece verba não declarada. Recuse e registre a tentativa.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">aumenta integridade</span></div></div><button class="btn btn-primary" ${state.energy<1||state.finished?'disabled':''} onclick="window.__game.integrityAction('reject')">Recusar</button></div>
+        <div class="action-card"><div><h4>Rejeitar oferta irregular</h4><p>Um personagem fictício oferece verba não declarada. Recuse e registre a tentativa.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">aumenta integridade</span></div></div><button class="btn btn-primary" ${state.energy<1||state.finished||state.phase==="government"?'disabled':''} onclick="window.__game.integrityAction('reject')">Recusar</button></div>
         <div class="action-card"><div><h4>Auditar as contas</h4><p>Contrate fiscalização interna fictícia e reduza exposição a irregularidades.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">R$ 0,8 mi</span></div></div><button class="btn btn-primary" ${state.energy<1||state.funds<.8||state.finished?'disabled':''} onclick="window.__game.integrityAction('audit')">Auditar</button></div>
-        <div class="action-card"><div><h4>Aceitar caixa dois (fictício)</h4><p>Receba recursos simulados não declarados: caixa aumenta, mas há risco de investigação, sanções e perda de votos. Não representa acusação contra pessoa ou partido real.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">risco alto</span></div></div><button class="btn btn-danger" ${state.energy<1||state.finished?'disabled':''} onclick="window.__game.integrityAction('illegal')">Aceitar</button></div>
+        <div class="action-card"><div><h4>Aceitar caixa dois (fictício)</h4><p>Receba recursos simulados não declarados: caixa aumenta, mas há risco de investigação, sanções e perda de votos. Não representa acusação contra pessoa ou partido real.</p><div class="action-meta"><span class="mini-chip">1 ação</span><span class="mini-chip">risco alto</span></div></div><button class="btn btn-danger" ${state.energy<1||state.finished||state.phase==="government"?'disabled':''} onclick="window.__game.integrityAction('illegal')">Aceitar</button></div>
       </div>`;
   }
 
@@ -918,12 +1144,13 @@
     if (!office) return;
     $("careerStateLabel").classList.toggle("hidden",office==="presidente");
     $("careerCityLabel").classList.toggle("hidden",!(office==="prefeito"||office==="vereador"));
+    $("careerElectorateLabel")?.classList.toggle("hidden",!(office==="prefeito"||office==="vereador"));
   }
 
   function changeCareerDraft(field,value) {
     if (!state) return;
-    const draft = state.careerDraft || {office:"presidente",uf:state.stateUF||"ES",municipality:state.municipality||""};
-    if (!(["office","uf","municipality"].includes(field))) return;
+    const draft = state.careerDraft || {office:"presidente",uf:state.stateUF||"ES",municipality:state.municipality||"",electorate:state.municipalityElectorate||300000,party:state.party};
+    if (!(["office","uf","municipality","electorate","party"].includes(field))) return;
     draft[field]=value;
     if (field==="uf" && (draft.office==="prefeito"||draft.office==="vereador")) draft.municipality=citiesByState[value]||"";
     state.careerDraft=draft;
@@ -938,14 +1165,24 @@
     if (!draft || !officeNames[draft.office] || !baseRegions.some(r=>r.uf===draft.uf)) return showToast("Selecione cargo e estado válidos");
     const city=(draft.municipality||citiesByState[draft.uf]||"").trim();
     if ((draft.office==="prefeito"||draft.office==="vereador") && !city) return showToast("Informe o município");
+    if ((draft.office==="prefeito"||draft.office==="vereador") && (!Number.isInteger(Number(draft.electorate))||Number(draft.electorate)<1000)) return showToast("Informe um eleitorado municipal simulado válido");
     if (state.phase==="government") {
+      const executiveSwitch=executiveOffices.has(state.office) && draft.office!==state.office;
+      const note=executiveSwitch?" A mudança para outro cargo pressupõe, na realidade, renúncia no prazo legal; o jogo registra uma renúncia simulada, sem calcular datas de desincompatibilização.":"";
       const msg=`Iniciar uma nova candidatura para ${officeNames[draft.office]}? Na simulação, o mandato atual será encerrado no mês ${state.administration.month} e ficará no histórico.`;
-      if (!confirm(msg)) return;
-      closeCareerMandate("encerrado para disputar outra eleição");
+      if (!confirm(msg+note)) return;
+      closeCareerMandate(executiveSwitch?"renunciou (simulação)":"encerrou antecipadamente");
     }
     const previousApproval=state.administration?.approval ?? 50;
     const oldOffice=state.office;
+    if(draft.party && draft.party!==state.party){
+      state.party=draft.party;
+      state.reputation=clamp(state.reputation-2,0,100);
+      addNews("Mudança partidária na carreira",`O candidato mudou de sigla antes da nova disputa. Regras de filiação e fidelidade não são modeladas integralmente.`);
+    }
+    const oldElectionYear=state.electionYear || nextElectionYear(state.office);
     state.campaignNumber=(state.campaignNumber||1)+1;
+    state.electionYear=nextElectionYear(draft.office,oldElectionYear);
     state.office=draft.office; state.stateUF=draft.uf;
     state.municipality=(draft.office==="vereador"||draft.office==="prefeito")?city:"";
     state.district = state.office==="presidente"?"Brasil":
@@ -953,26 +1190,31 @@
     state.phase="campaign";state.finished=false;state.week=24;state.turns=0;
     state.energy=state.maxEnergy||3;
     // Caixa de campanha é reiniciado; orçamento do mandato anterior jamais vira verba eleitoral.
-    state.funds=state.difficulty==="expert"?11:state.difficulty==="hard"?13:15;
+    state.partyProfile=newPartyProfile(state.party);
+    state.funds=(state.difficulty==="expert"?11:state.difficulty==="hard"?13:15)+(state.partyProfile.development-45)/35;
     state.reputation=clamp(state.reputation*.60+previousApproval*.40,23,83);
-    state.ground=clamp(18+state.ground*.18,18,38);
+    state.ground=clamp(18+state.ground*.18+(state.partyProfile.organization-50)/14,18,38);
     state.media=0;state.digital=clamp(state.digital*.4,12,48);state.debate=clamp(state.debate*.6,20,70);
     state.regions=electionDistricts(draft.office,draft.uf,city).map(r=>({...r,
       support:clamp(r.support+(state.reputation-50)*.09,5,57)}));
-    state.opponents=(draft.office==="presidente"?opponents:fictionalRivals).map(o=>({...o}));
+    state.opponents=(draft.office==="presidente"?opponents:fictionalRivals).map((o,i)=>({...o,funds:11+i*2,activity:"Preparando a campanha"}));
+    state.municipalityElectorate=Number(draft.electorate)||300000;
+    state.rivalActivity=[];
+    state.pendingEvent=null;
+    state.lastElection=null;
     state.coalitions=coalitionDefs.map(c=>({...c,secured:false}));
     state.proposals={};state.administration=null;
     state.debateAvailable=null;state.pendingDebate=null;state.runoffRival=null;state.runoffBase=null;
     state.careerDraft=null;
     previousNational=nationalSupport();
-    addNews("Nova candidatura registrada",`Depois da disputa por ${officeNames[oldOffice]}, você inicia campanha para ${officeNames[state.office]} (${state.district}).`);
+    addNews("Nova candidatura registrada",`Após ${officeNames[oldOffice]}, começa a campanha alternativa de ${state.electionYear} para ${officeNames[state.office]} (${state.district}).`);
     normalize(); renderAll(); navTo("overview");
     showToast("Nova campanha iniciada; carreira preservada");
   }
 
   function renderCareer() {
     const el=$("careerContent");if(!el)return;
-    if (!state.careerDraft) state.careerDraft={office:"presidente",uf:state.stateUF||"ES",municipality:state.municipality||""};
+    if (!state.careerDraft) state.careerDraft={office:"presidente",uf:state.stateUF||"ES",municipality:state.municipality||"",electorate:state.municipalityElectorate||300000,party:state.party};
     const d=state.careerDraft;
     const canRun=["government","ended"].includes(state.phase);
     const current=state.phase==="government"?`${officeNames[state.office]} — ${state.district} (${state.administration.month}/${state.administration.maxMonths} meses)`:
@@ -980,7 +1222,7 @@
     const records=(state.careerHistory||[]).slice().reverse();
     el.innerHTML=`
       <div class="panel career-current"><p class="eyebrow">SITUAÇÃO ATUAL</p><h3>${safeText(current)}</h3>
-      <p>Nome político: ${safeText(state.candidate)} · Partido: ${safeText(state.party)} · Campanha ${state.campaignNumber||1}</p>
+      <p>Nome político: ${safeText(state.candidate)} · Partido: ${safeText(state.party)} · Campanha ${state.campaignNumber||1} · Eleição ${state.electionYear||"simulada"}</p>
       </div>
       <div class="panel" style="margin-top:14px">
        <p class="eyebrow">NOVA CANDIDATURA</p><h3>Escolha sua próxima eleição</h3>
@@ -993,13 +1235,17 @@
            ${baseRegions.map(r=>`<option value="${r.uf}" ${r.uf===d.uf?"selected":""}>${r.name} (${r.uf})</option>`).join("")}
          </select></label>
          <label id="careerCityLabel"><span>Município</span><input id="careerCity" maxlength="60" value="${safeText(d.municipality)}" onchange="window.__game.changeCareerDraft('municipality',this.value)" placeholder="Ex.: Vitória" /></label>
+         <label id="careerElectorateLabel"><span>Eleitorado municipal simulado</span><input type="number" min="1000" max="15000000" value="${Number(d.electorate)||300000}" onchange="window.__game.changeCareerDraft('electorate',this.value)" /></label>
+         <label><span>Partido para a próxima eleição</span><select onchange="window.__game.changeCareerDraft('party',this.value)">
+           ${[...$("partyName").options].map(o=>`<option value="${safeText(o.value)}" ${(d.party||state.party)===o.value?"selected":""}>${safeText(o.textContent)}</option>`).join("")}
+         </select></label>
        </div>
        <div class="card-actions"><button class="btn btn-primary" ${!canRun?"disabled":""} onclick="window.__game.startNextCampaign()">Disputar nova eleição</button></div>
        ${!canRun?"<p>Conclua a campanha em andamento antes de iniciar outra.</p>":""}
       </div>
       <div class="panel" style="margin-top:14px"><p class="eyebrow">HISTÓRICO</p><h3>Trajetória eleitoral e mandatos</h3>
         <div class="career-history">${records.length?records.map(h=>`<div class="career-record">
-          <div><strong>${safeText(officeNames[h.office]||h.office)} · ${safeText(h.district)}</strong><small>${safeText(h.party||state.party)} · Campanha ${h.election||1}</small></div>
+          <div><strong>${safeText(officeNames[h.office]||h.office)} · ${safeText(h.district)}</strong> <small>${safeText(h.party||state.party)} · Campanha ${h.election||1} · Ano ${h.year||"simulado"}</small></div>
           <div class="career-meta"><span class="badge">${safeText(h.kind==="mandate"?h.status:h.result)}</span><small>${h.kind==="mandate"?`${h.months||0}/${h.total||48} meses · aprovação ${round1(h.approval||0)}%`:`${round1(h.vote||0)}% dos votos simulados`}</small></div>
         </div>`).join(""):"<p>Nenhuma eleição concluída nesta carreira.</p>"}</div>
       </div>`;
@@ -1008,36 +1254,30 @@
 
   // --- Debates programados, perguntas interativas e estado persistente ---
   const debateQuestions=[
-    {topic:"Custo de vida",question:"A população relata dificuldade para pagar alimentação e serviços. Qual resposta você apresentará?",options:[
-      {text:"Explicar medidas emergenciais e seus custos de financiamento.",impact:.65,rep:.5},
-      {text:"Apresentar estratégia gradual de produtividade e renda.",impact:.45,rep:.35},
-      {text:"Priorizar contraste com adversários, sem entrar em detalhes.",impact:-.4,rep:-.45}
-    ]},
-    {topic:"Segurança pública",question:"O mediador pergunta como sua candidatura lidará com criminalidade e prevenção. Como você responde?",options:[
-      {text:"Apresentar metas, integração e mecanismos de prestação de contas.",impact:.65,rep:.55},
-      {text:"Concentrar resposta em ampliação de equipamentos e efetivos.",impact:.25,rep:.10},
-      {text:"Usar frases genéricas e evitar explicações.",impact:-.55,rep:-.4}
-    ]},
-    {topic:"Saúde",question:"Uma pergunta cobra resultados concretos para reduzir filas e ampliar serviços. O que você propõe?",options:[
-      {text:"Definir prioridades, indicadores e fontes de recursos.",impact:.7,rep:.5},
-      {text:"Anunciar expansão ampla, deixando o custo para depois.",impact:.25,rep:-.15},
-      {text:"Mudar de assunto e responder com ataque pessoal.",impact:-.6,rep:-.55}
-    ]},
-    {topic:"Integridade",question:"Um eleitor quer saber como seu partido prevenirá uso indevido de recursos públicos. Qual compromisso você apresenta?",options:[
-      {text:"Propor auditorias, dados abertos e controles independentes.",impact:.75,rep:.6},
-      {text:"Defender procedimentos internos de fiscalização.",impact:.35,rep:.2},
-      {text:"Evitar compromissos verificáveis e minimizar a pergunta.",impact:-.8,rep:-.8}
-    ]},
-    {topic:"Emprego e renda",question:"Como sua campanha pretende estimular oportunidades de trabalho no território?",options:[
-      {text:"Combinar qualificação, investimento e avaliação de metas.",impact:.65,rep:.45},
-      {text:"Propor incentivos econômicos com revisão periódica.",impact:.4,rep:.25},
-      {text:"Prometer emprego imediato para todos, sem mecanismo.",impact:-.6,rep:-.6}
-    ]},
-    {topic:"Educação",question:"Professores e estudantes perguntam sobre qualidade da educação e financiamento. Como você se posiciona?",options:[
-      {text:"Apresentar metas pedagógicas e planejamento orçamentário.",impact:.65,rep:.45},
-      {text:"Defender expansão de vagas e revisar indicadores depois.",impact:.25,rep:.15},
-      {text:"Fazer uma promessa genérica sem detalhar execução.",impact:-.45,rep:-.3}
-    ]}
+    {topic:"Custo de vida",question:"A população relata dificuldades com alimentação e serviços. Que estratégia você detalhará?", options:[
+      {text:"Combinar auxílio focalizado e revisão periódica do custo fiscal.",impact:.40,rep:.25,style:"social"},
+      {text:"Reduzir entraves à produção e apresentar metas de preços.",impact:.44,rep:.24,style:"liberal"},
+      {text:"Pactuar metas de renda, produtividade e controle de despesas.",impact:.42,rep:.26,style:"centro"}]},
+    {topic:"Segurança pública",question:"O mediador pergunta sobre segurança e prevenção. Qual será o eixo principal?",options:[
+      {text:"Priorizar investigação e prevenção com metas de resultados.",impact:.43,rep:.30,style:"social"},
+      {text:"Reforçar policiamento orientado por dados e fiscalização.",impact:.45,rep:.22,style:"conservador"},
+      {text:"Integrar polícia, políticas sociais e acompanhamento externo.",impact:.43,rep:.27,style:"centro"}]},
+    {topic:"Saúde",question:"Como lidar com filas e financiamento do atendimento?",options:[
+      {text:"Expandir equipes de atenção primária com métricas de fila.",impact:.45,rep:.22,style:"social"},
+      {text:"Integrar redes públicas e contratadas com auditoria de custos.",impact:.44,rep:.23,style:"liberal"},
+      {text:"Focar regulação de acesso, filas transparentes e metas públicas.",impact:.45,rep:.24,style:"centro"}]},
+    {topic:"Integridade",question:"Como seu partido prevenirá uso indevido de recursos públicos?",options:[
+      {text:"Publicar dados abertos e auditorias periódicas independentes.",impact:.45,rep:.26,style:"verde"},
+      {text:"Definir compliance, trilhas de auditoria e responsabilidade individual.",impact:.45,rep:.27,style:"liberal"},
+      {text:"Ampliar controles cruzados e acompanhamento institucional.",impact:.46,rep:.24,style:"centro"}]},
+    {topic:"Emprego e renda",question:"Como estimular o emprego e o investimento no território?",options:[
+      {text:"Investir em qualificação e obras com metas transparentes.",impact:.44,rep:.24,style:"social"},
+      {text:"Simplificar regras de empreender e medir novas vagas.",impact:.46,rep:.20,style:"liberal"},
+      {text:"Coordenar educação, infraestrutura e acordos produtivos.",impact:.44,rep:.23,style:"centro"}]},
+    {topic:"Educação",question:"Professores perguntam sobre qualidade e financiamento. Qual resposta você dará?",options:[
+      {text:"Promover formação docente e avaliações com apoio pedagógico.",impact:.45,rep:.26,style:"social"},
+      {text:"Priorizar resultados, autonomia das escolas e transparência.",impact:.45,rep:.24,style:"liberal"},
+      {text:"Unir metas de aprendizagem e colaboração federativa.",impact:.45,rep:.23,style:"centro"}]}
   ];
 
   function scheduledQuestions(round,week){
@@ -1058,35 +1298,54 @@
     if(!state.debateAvailable)return showToast("Não há debate agendado nesta semana");
     const d=state.debateAvailable;
     state.pendingDebate={id:d.id,title:d.title,week:d.week,round:d.round,
-      questionIds:scheduledQuestions(d.round,d.week),step:0,score:0,answers:[]};
+      questionIds:scheduledQuestions(d.round,d.week),step:0,segment:"answer",currentEffect:0,score:0,answers:[],replies:[]};
     renderAll();navTo("debate");
   }
 
   function answerDebate(optionIndex){
     const db=state?.pendingDebate;if(!db||state.finished)return;
+    db.segment ??="answer";db.replies ??=[];
     const question=debateQuestions[db.questionIds[db.step]];
-    const answer=question?.options[optionIndex];if(!answer)return;
-    const expertise=(state.debate-35)/120;
-    const fluctuation=rnd(-.38,.38);
-    const effect=clamp(answer.impact+expertise+fluctuation,-1.7,1.7);
-    const repChange=answer.rep+effect*.22;
-    const mediaChange=effect*1.7;
-    state.reputation+=repChange;state.media+=mediaChange;
-    state.regions.forEach(r=>r.support=clamp(r.support+effect*(r.issue===question.topic ? .22:.09),4,62));
-    if(state.phase==="runoff")state.runoffBase=clamp(state.runoffBase+effect*.46,25,75);
-    db.score=round1(db.score+effect);
-    db.answers.push({topic:question.topic,answer:answer.text,effect:round1(effect)});
-    db.step++;
+    if(!question)return;
+    if(db.segment==="reply"){
+      const replies=[{text:"Responder com dados e reconhecer limitações",rep:.45,media:.1,risk:-.15},
+       {text:"Contrapor argumentos e reforçar diferenças",rep:.08,media:.5,risk:.12},
+       {text:"Evitar o confronto e retornar à proposta",rep:.25,media:-.1,risk:-.05}];
+      const a=replies[optionIndex];if(!a)return;
+      const change=a.rep + rnd(-.2,.2) - (state.reputation<35?.13:0);
+      const score=clamp(change+a.media+db.currentEffect*.1,-1,1.5);
+      state.reputation+=change;state.media+=a.media;
+      state.regions.forEach(r=>r.support+=score*.07);
+      db.score=round1(db.score+score);
+      db.replies.push({topic:question.topic,text:a.text,effect:round1(score)});
+      db.step++;db.segment="answer";db.currentEffect=0;
+    } else {
+      const answer=question.options[optionIndex];if(!answer)return;
+      const expertise=(state.debate-35)/115;
+      const context=(state.regions.reduce((sum,r)=>sum+(r.issue===question.topic?r.voters:0),0)/100)*.38;
+      // Neutral trade-offs: the highest base is not necessarily best for every electorate.
+      const tradeoff=answer.style===state.ideology?.24:answer.style==="centro"?.10:0;
+      const integrityImpact=question.topic==="Integridade"?(state.integrity-50)/160:0;
+      const difficulty=state.difficulty==="expert"?-.22:state.difficulty==="hard"?-.12:0;
+      const effect=clamp(answer.impact*.55 + expertise + context + tradeoff + integrityImpact + difficulty + rnd(-.38,.40),-1.7,1.7);
+      state.reputation+=answer.rep*.6+effect*.20;state.media+=effect*1.2;
+      state.regions.forEach(r=>r.support=clamp(r.support+effect*(r.issue===question.topic?.23:.08),4,62));
+      if(state.phase==="runoff")state.runoffBase=clamp(state.runoffBase+effect*.42,25,75);
+      db.score=round1(db.score+effect);db.currentEffect=effect;
+      db.answers.push({topic:question.topic,answer:answer.text,effect:round1(effect)});
+      db.segment="reply";
+      // A generic fictional team makes a question; never attribute made-up quotes to named politicians.
+      db.rivalResponse=["Equipe adversária questiona os custos previstos.","Equipe adversária pede metas verificáveis.","Equipe adversária contesta o prazo de execução."][Math.floor(Math.random()*3)];
+    }
     normalize();
     if(db.step>=db.questionIds.length){
       state.debateHistory ??=[];
       state.debateHistory.push({id:db.id,campaign:state.campaignNumber,office:state.office,district:state.district,
-        title:db.title,score:db.score,answers:db.answers,week:db.week,round:db.round});
+        title:db.title,score:db.score,answers:db.answers,replies:db.replies,week:db.week,round:db.round});
       state.pendingDebate=null;state.debateAvailable=null;
-      addNews("Debate concluído",`${db.title}: você respondeu a ${db.answers.length} perguntas. Saldo simulado: ${db.score>=0?"+":""}${db.score} pontos.`);
+      addNews("Debate concluído",`${db.title}: ${db.answers.length} perguntas e ${db.replies.length} réplicas. Saldo simulado: ${db.score>=0?"+":""}${db.score} pontos.`);
       renderAll();
-      showDecision("Debate concluído",`Você respondeu ${db.answers.length} perguntas. Saldo de desempenho da simulação: ${db.score>=0?"+":""}${db.score}. A preparação, a repercussão e suas respostas influenciaram a pesquisa e a reputação.`,`Ver análise`,()=>navTo("debate"));
-      return;
+      showDecision("Debate concluído",`Foram ${db.answers.length} respostas e ${db.replies.length} réplicas. Saldo de desempenho ${db.score>=0?"+":""}${db.score}.`,"Ver análise",()=>navTo("debate"));return;
     }
     renderAll();navTo("debate");
   }
@@ -1098,17 +1357,20 @@
     let current;
     if(db){
       const question=debateQuestions[db.questionIds[db.step]];
+      const reply=(db.segment==="reply");
+      const replies=["Responder com dados e reconhecer limitações","Contrapor argumentos e reforçar diferenças","Evitar o confronto e retornar à proposta"];
       current=`<div class="panel debate-live"><p class="eyebrow">AO VIVO · ${safeText(db.title)}</p>
-       <div class="debate-step">Pergunta ${db.step+1} de ${db.questionIds.length} · ${safeText(question.topic)}</div>
-       <h3>${safeText(question.question)}</h3>
-       <p>Escolha como seu candidato vai responder. A preparação para debates pode alterar a repercussão.</p>
-       <div class="debate-answers">${question.options.map((option,i)=>`<button class="choice-btn" onclick="window.__game.answerDebate(${i})"><strong>${safeText(option.text)}</strong><span>Responder ao mediador</span></button>`).join("")}</div>
+       <div class="debate-step">Pergunta ${db.step+1} de ${db.questionIds.length} · ${reply?"RÉPLICA":"RESPOSTA"} · ${safeText(question.topic)}</div>
+       <h3>${reply?"Direito de resposta":safeText(question.question)}</h3>
+       <p>${reply?safeText(db.rivalResponse||"Equipe adversária apresenta uma crítica fictícia."):"Escolha sua linha de resposta. Desempenho depende do tema, preparação e do público regional."}</p>
+       <div class="debate-answers">${reply?replies.map((text,i)=>`<button class="choice-btn" onclick="window.__game.answerDebate(${i})"><strong>${safeText(text)}</strong><span>Apresentar réplica</span></button>`).join(""):
+         question.options.map((option,i)=>`<button class="choice-btn" onclick="window.__game.answerDebate(${i})"><strong>${safeText(option.text)}</strong><span>Responder ao mediador</span></button>`).join("")}</div>
        <p class="debate-score">Desempenho acumulado: <strong>${db.score>=0?"+":""}${round1(db.score)}</strong></p>
        </div>`;
     } else if (state.debateAvailable){
       const d=state.debateAvailable;
       current=`<div class="panel debate-live"><p class="eyebrow">DEBATE MARCADO</p><h3>${safeText(d.title)}</h3>
-        <p>Quatro perguntas sobre políticas públicas e integridade. Suas respostas alteram indicadores simulados de campanha. O jogo aguarda sua participação antes da próxima semana.</p>
+        <p>Quatro perguntas, cada uma com uma réplica. Escolha respostas contextualizadas; preparação e repercussão influenciam indicadores simulados. O jogo espera o debate para avançar.</p>
         <button class="btn btn-primary" onclick="window.__game.startDebate()">Entrar no estúdio e participar</button></div>`;
     } else {
       current=`<div class="panel"><p class="eyebrow">AGENDA DOS DEBATES</p><h3>${state.phase==="government"||state.phase==="ended"?"Nenhum debate durante o mandato":"Próximo encontro eleitoral"}</h3>
@@ -1169,13 +1431,19 @@
     state.office ??= "presidente";
     state.district ??= "Brasil";
       state.phase ??= state.finished ? "ended":"campaign";
-      state.version = 6;
+      state.version = 7;
       state.careerHistory ??= [];
       state.careerDraft ??= null;
       state.campaignNumber ??= 1;
+      state.electionYear ??= nextElectionYear(state.office);
       state.debateHistory ??= [];
       state.debateAvailable ??= null;
       state.pendingDebate ??= null;
+      state.pendingEvent ??= null;
+      state.rivalActivity ??= [];
+      state.municipalityElectorate ??= 300000;
+      state.lastElection ??= null;
+      state.opponents.forEach((o,i)=>{o.funds ??= 11+i*2;o.activity ??="Preparando a campanha";});
     // Compatibilidade: um mandato salvo na v5 também aparece no histórico da carreira.
     if (state.administration && !state.careerHistory.some(h => h.kind === "mandate" && h.status === "em curso")) {
       const alreadyEnded = state.phase === "ended";
@@ -1186,7 +1454,10 @@
     }
     state.electionHistory ??= [];
     state.administration ??= null;
+    if (state.careerDraft) {state.careerDraft.party ??= state.party;state.careerDraft.electorate ??= state.municipalityElectorate;}
+    state.municipalityElectorate=Math.max(1000,Number(state.municipalityElectorate)||300000);
     state.integrity ??= 65;
+    state.partyProfile ??= newPartyProfile(state.party);
     state.corruptionRisk ??= 0;
     state.investigation ??= 0;
     state.illicitFunds ??= 0;
@@ -1194,6 +1465,7 @@
     $("setup").classList.add("hidden");
     $("game").classList.remove("hidden");
     renderAll();
+    if(state.pendingEvent !== null && state.pendingEvent !== undefined) triggerEvent(events[state.pendingEvent],state.pendingEvent);
   }
   function loadGame() {
     let raw;
@@ -1227,8 +1499,9 @@
   }
 
   function newGameConfirm() {
-    if (confirm("Iniciar uma nova campanha? O estado atual não salvo será perdido.")) {
+    if (confirm("Iniciar novo jogo e apagar o salvamento local atual? Exporte um backup antes, caso queira guardá-lo.")) {
       state = null;
+      try{localStorage.removeItem(SAVE_KEY);}catch{}
       $("game").classList.add("hidden");
       $("setup").classList.remove("hidden");
     }
@@ -1266,11 +1539,12 @@
     const office=selectedOffice();
     $("stateSelectLabel").classList.toggle("hidden",office==="presidente");
     $("citySelectLabel").classList.toggle("hidden",!(office==="prefeito"||office==="vereador"));
+    $("electorateSelectLabel").classList.toggle("hidden",!(office==="prefeito"||office==="vereador"));
   }
   $("stateChoice").innerHTML=baseRegions.map(r=>`<option value="${r.uf}">${r.name} (${r.uf})</option>`).join("");
   $("stateChoice").value="ES";
   $("officeChoice").onchange=updateOfficeForm;
-  $("stateChoice").onchange=()=>{$("cityChoice").value=citiesByState[$("stateChoice").value]||"";};
+  $("stateChoice").onchange=()=>{$("cityChoice").value=citiesByState[$("stateChoice").value]||"";$("electorateChoice").value="300000";};
   updateOfficeForm();
   $("startGame").onclick = startGame;
   $("loadGameSetup").onclick = loadGame;
@@ -1295,6 +1569,6 @@
     integrityAction,
     governmentPolicy, cabinetAction,
     openCareer: () => navTo("career"),
-    changeCareerDraft, startNextCampaign, startDebate, answerDebate
+    changeCareerDraft, startNextCampaign, startDebate, answerDebate, partyAction
   };
 })();
