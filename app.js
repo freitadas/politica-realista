@@ -312,7 +312,10 @@
     const partyProfile = newPartyProfile($("partyName").value);
 
     return {
-      version: 7,
+      version: 8,
+      apuracao: null,
+      apuracaoHistory: [],
+      apuracaoArchiveIndex: null,
       phase: "campaign",
       office: selectedOffice(),
       stateUF: $("stateChoice").value,
@@ -438,6 +441,7 @@
     if (state.finished || state.phase === "ended") { navTo("career"); return; }
     if (state.pendingEvent !== null && state.pendingEvent !== undefined) { triggerEvent(events[state.pendingEvent],state.pendingEvent); return; }
     if (state.debateAvailable || state.pendingDebate) { navTo("debate"); showToast("Responda ao debate antes de avançar"); return; }
+    if (state.phase === "counting") return advanceApuracao();
     if (state.phase === "government") return governmentTurn();
     if (state.phase === "runoff") return runoffElection();
     if (state.week <= 1) return election();
@@ -523,13 +527,13 @@
   // Approximate proportional distribution: QE/QP, 10% QE individual minimum,
   // 80% QE party and 20% QE candidate for early largest-average leftovers.
   // Artificial totals and lists are for play; not an official TSE calculation.
-  function calculateProportional(share) {
+  function calculateProportional(share, validVoteOverride = null) {
     const stateSize={SP:70,MG:53,RJ:46,BA:39,RS:31,PR:30,PE:25,CE:22,PA:17,SC:16,GO:17,MA:18,ES:10,DF:8};
     const isCity=state.office==="vereador";
     const seats=isCity ? clamp(Math.round((state.municipalityElectorate||150000)/50000)+9,9,55)
       : state.office==="deputado_federal" ? (stateSize[state.stateUF]||8)
       : clamp(Math.round((stateSize[state.stateUF]||8)*1.35)+12,24,94);
-    const validVotes=Math.round(isCity ? Math.max(1000,state.municipalityElectorate||150000)*.72 : 1200000);
+    const validVotes=validVoteOverride ?? Math.round(isCity ? Math.max(1000,state.municipalityElectorate||150000)*.72 : 1200000);
     const qe=Math.max(1,Math.round(validVotes/seats));
     // The user's visible support is an individual preference proxy, NOT their party vote.
     const partyIds=[state.party,'PT','PL','PSD','MDB','PSB','UNIÃO','REPUBLICANOS','PDT','NOVO']
@@ -537,8 +541,9 @@
     const playerVoteShare=clamp(share,4,54);
     const partyWeights=partyIds.map((p,i)=>i===0?clamp(10+playerVoteShare*.38,9,34):rnd(6,21));
     const wsum=partyWeights.reduce((a,b)=>a+b,0);
+    const partyCounts=allocateExact(validVotes,partyWeights);
     const parties=partyIds.map((id,i)=>{
-      const totalVotes=Math.round(validVotes*partyWeights[i]/wsum);
+      const totalVotes=partyCounts[i];
       const listSize=Math.max(12,Math.ceil(seats*.35));
       const raw=Array.from({length:listSize},(_,j)=>rnd(.35,2.8)/Math.sqrt(j+1));
       if(i===0) raw[0]=clamp(playerVoteShare/20, .45, 3.1);
@@ -572,6 +577,7 @@
     const player=own.members.find(c=>c.name===state.candidate);
     return {elected:own.winners.some(c=>c.name===state.candidate),seats,qe,votes:player?.votes||0,
       partyVotes:own.votes,partySeats:own.seats,party:own.id,validVotes,
+      candidateResults:parties.flatMap(p=>p.members.map(c=>({name:c.name,party:p.id,votes:c.votes}))),
       details:parties.map(p=>({party:p.id,seats:p.seats,votes:p.votes}))};
   }
 
@@ -580,56 +586,258 @@
     return state.office==="prefeito" && Number(state.municipalityElectorate||0)>200000;
   }
 
-  function election() {
-    const estimates = [
-      {name: state.candidate, votes: nationalSupport() + (state.ground-25)/40 + (state.reputation-50)/60 + rnd(-1,1)},
-      ...state.opponents.map(o => ({name:o.name,votes:o.poll+rnd(-1,1)}))
-    ];
-    const total = estimates.reduce((x,c)=>x+Math.max(c.votes,1),0);
-    estimates.forEach(c => c.votes = round1(100*Math.max(c.votes,1)/total));
-    estimates.sort((a,b)=>b.votes-a.votes);
-    state.electionHistory = state.electionHistory || [];
-    state.electionHistory.push({round:1,office:state.office,district:state.district,year:state.electionYear,campaign:state.campaignNumber,results:estimates});
+  // Apuração simulada: totais fixados na abertura e liberados em blocos horários.
+  // Cada avanço revela uma parcela do resultado predeterminado; não gera novos votos.
+  const APURACAO_HOURS=["17:00","18:00","19:00","20:00","21:00","22:00","23:00","00:00"];
+  const APURACAO_FRACTIONS=[.06,.18,.32,.47,.64,.79,.91,1];
+  const fmtVotes=n=>Math.round(n).toLocaleString("pt-BR");
+
+  function allocateExact(total,weights){
+    const normalized=weights.map(x=>Math.max(0,Number(x)||0));
+    const sum=normalized.reduce((a,b)=>a+b,0);
+    if(!sum)throw new Error("Pesos eleitorais inválidos");
+    const exact=normalized.map(v=>total*v/sum);
+    const values=exact.map(v=>Math.floor(v));
+    let remaining=total-values.reduce((a,b)=>a+b,0);
+    const order=exact.map((v,i)=>({i,fraction:v-values[i]})).sort((a,b)=>b.fraction-a.fraction||a.i-b.i);
+    for(let j=0;j<remaining;j++)values[order[j%order.length].i]++;
+    return values;
+  }
+
+  function allocateCapped(total,weights,cap){
+    const result=new Array(weights.length).fill(0);
+    const available=weights.map(()=>true);
+    let left=total;
+    for(let attempts=0; attempts<=weights.length;attempts++){
+      const active=available.map((v,i)=>v?i:-1).filter(i=>i>=0);
+      if(!active.length){if(left)throw new Error("Sem candidaturas suficientes para votos do Senado");break;}
+      const proposal=allocateExact(left,active.map(i=>weights[i]));
+      const capped=active.filter((i,j)=>proposal[j]>cap);
+      if(!capped.length){active.forEach((i,j)=>result[i]=proposal[j]);left=0;break;}
+      capped.forEach(i=>{result[i]=cap;available[i]=false;left-=cap;});
+    }
+    if(left)throw new Error("Distribuição de votos não concluída");
+    return result;
+  }
+
+  function electionElectorate(){
+    if(state.office==="prefeito"||state.office==="vereador")return Math.max(1000,Math.round(Number(state.municipalityElectorate)||300000));
+    if(state.office==="presidente")return 150000000; // Base fictícia, não dado oficial
+    const region=baseRegions.find(r=>r.uf===state.stateUF)||baseRegions[0];
+    return Math.max(20000,Math.round(150000000*region.voters/100));
+  }
+
+  function makeFixedEstimate(round){
+    if(round===2){
+      const share=clamp(state.runoffBase+(state.reputation-50)/30+state.media/22+rnd(-2,2),15,85);
+      return [{name:state.candidate,party:state.party,weight:share},
+              {name:state.runoffRival,party:state.opponents.find(o=>o.name===state.runoffRival)?.party||"Oposição",weight:100-share}];
+    }
+    const data=[{name:state.candidate,party:state.party,weight:nationalSupport()+(state.ground-25)/40+(state.reputation-50)/60+rnd(-1,1)},
+      ...state.opponents.map(o=>({name:o.name,party:o.party,weight:o.poll+rnd(-1,1)}))];
+    return data.map(c=>({...c,weight:Math.max(1,c.weight)}));
+  }
+
+  // Exact hourly row/column totals, including candidate votes, blank and null.
+  // Changes in the percentages are due to simulated differences in counting regions.
+  function makeCountSnapshots(finals,turnout,slots){
+    const targets=finals.map(c=>c.votes);
+    const remaining=targets.slice();
+    let lastProcessed=0;
+    const cumulative=new Array(targets.length).fill(0);
+    const snapshots=[];
+    const profile=targets.map((_,i)=>rnd(-.36,.36));
+    for(let index=0; index<APURACAO_HOURS.length; index++){
+      const people=index===APURACAO_HOURS.length-1?turnout:Math.round(turnout*APURACAO_FRACTIONS[index]);
+      const rowTotal=(people-lastProcessed)*slots;
+      let portions;
+      if(index===APURACAO_HOURS.length-1)portions=remaining.slice();
+      else {
+        // A row's target never exceeds remaining final totals.
+        const toAllocate=rowTotal;
+        const bias=(3.5-index)/3.5;
+        const weights=remaining.map((v,j)=>v*Math.max(.35,1+profile[j]*bias));
+        // Iteratively distribute the integer row without exceeding any final column.
+        portions=new Array(remaining.length).fill(0);
+        let missing=toAllocate;
+        let tries=0;
+        while(missing>0 && tries++<remaining.length+3){
+          const caps=remaining.map((v,j)=>v-portions[j]);
+          const weighted=caps.map((v,j)=>v>0?weights[j]:0);
+          if(!weighted.some(x=>x>0))break;
+          const guess=allocateExact(missing,weighted);
+          let allocated=0;
+          guess.forEach((v,j)=>{const inc=Math.min(v,caps[j]);portions[j]+=inc;allocated+=inc;});
+          missing-=allocated;
+        }
+        if(missing)throw new Error("Falha na conservação de votos por hora");
+      }
+      portions.forEach((v,j)=>{cumulative[j]+=v;remaining[j]-=v;});
+      snapshots.push({hour:APURACAO_HOURS[index],voters:people,counts:cumulative.slice()});
+      lastProcessed=people;
+    }
+    if(remaining.some(v=>v!==0))throw new Error("Apuração não conciliada");
+    return snapshots;
+  }
+
+  function startApuracao(round){
+    if(state.apuracao && state.phase==="counting"){navTo("apuracao");return;}
+    const electorate=electionElectorate();
+    const turnout=Math.round(electorate*rnd(.73,.84));
+    const seats=state.office==="senador"&&round===1&&((state.electionYear-2026)%8===0)?2:1;
+    const slots=state.office==="senador"?seats:1;
+    const ballots=turnout*slots;
+    const blank=Math.round(ballots*rnd(.012,.029));
+    const nullVotes=Math.round(ballots*rnd(.018,.042));
+    const validVotes=ballots-blank-nullVotes;
+    let candidates=[];
+    let proportional=null;
+    const estimates=makeFixedEstimate(round);
+    if(round===1 && ["deputado_federal","deputado_estadual","vereador"].includes(state.office)){
+      const ownPercent=100*estimates[0].weight/estimates.reduce((a,b)=>a+b.weight,0);
+      proportional=calculateProportional(ownPercent,validVotes);
+      candidates=proportional.candidateResults.map(x=>({name:x.name,party:x.party,votes:x.votes}));
+    }else{
+      const counts=state.office==="senador"&&slots>1
+        ?allocateCapped(validVotes,estimates.map(c=>c.weight),turnout)
+        :allocateExact(validVotes,estimates.map(c=>c.weight));
+      candidates=estimates.map((c,i)=>({name:c.name,party:c.party,votes:counts[i]}));
+    }
+    const all=[...candidates,{name:"Votos em branco",party:"",votes:blank},{name:"Votos nulos",party:"",votes:nullVotes}];
+    const snapshots=makeCountSnapshots(all,turnout,slots);
+    state.apuracao={campaign:state.campaignNumber,round,office:state.office,district:state.district,
+      electionYear:state.electionYear,hourIndex:0,registered:electorate,turnout,
+      abstentions:electorate-turnout,slots,validVotes,blank,nullVotes,candidates,
+      proportional,snapshots};
+    state.phase="counting";
     state.week=0;
-    const own=estimates.find(c=>c.name===state.candidate);
-    if (["deputado_federal","deputado_estadual","vereador"].includes(state.office)) {
-      const result=calculateProportional(own.votes);
-      state.lastElection={...result,kind:"proportional",office:state.office};
-      addNews("Apuração proporcional simulada",`${result.party}: ${result.partySeats} de ${result.seats} cadeiras; QE simulado de ${result.qe.toLocaleString("pt-BR")} votos.`);
-      return concludeElection(result.elected,round1(result.votes/result.validVotes*100),1);
+    state.energy=0;
+    addNews("Urnas fechadas — apuração iniciada",`A contagem simulada do ${round}º turno começou às 17h. Avance uma hora por vez até 00h.`);
+    renderAll();navTo("apuracao");
+  }
+
+  function election(){ startApuracao(1); }
+
+  function runoffElection(){
+    if (state.week>1) {
+      state.runoffBase=clamp(state.runoffBase+(nationalSupport()-25)/25+rnd(-1.5,1.5),25,75);
+      state.week--;state.energy=3;
+      addNews("Pesquisa de segundo turno",`Disputa permanece competitiva contra ${state.runoffRival}.`);
+      renderAll();return;
     }
-    if (state.office==="senador") {
-      // In alternating general elections, the simulated state elects two or one senators.
-      const seats = ((state.electionYear-2026)%8===0)?2:1;
+    startApuracao(2);
+  }
+
+  function advanceApuracao(){
+    const a=state?.apuracao;
+    if(!a||state.phase!=="counting")return;
+    if(a.hourIndex>=APURACAO_HOURS.length-1)return concludeApuracao();
+    a.hourIndex++;
+    renderAll();navTo("apuracao");
+  }
+
+  function concludeApuracao(){
+    const a=state?.apuracao;
+    if(!a||a.hourIndex!==APURACAO_HOURS.length-1)return showToast("Conclua a apuração até 00h");
+    state.apuracaoHistory??=[];
+    state.apuracaoHistory.push(JSON.parse(JSON.stringify(a)));
+    state.apuracaoArchiveIndex=state.apuracaoHistory.length-1;
+    // Keep the final electoral snapshot unchanged throughout the count and final decision.
+    const votes= a.candidates.map(c=>({name:c.name,party:c.party,votes:round1(100*c.votes/a.validVotes)})).sort((x,y)=>y.votes-x.votes);
+    state.electionHistory??=[];
+    state.electionHistory.push({round:a.round,office:a.office,district:a.district,year:a.electionYear,
+      campaign:a.campaign,results:votes,registered:a.registered,turnout:a.turnout,
+      abstentions:a.abstentions,blank:a.blank,nullVotes:a.nullVotes,validVotes:a.validVotes});
+    if(a.round===2){
+      const personal=a.candidates.find(c=>c.name===state.candidate)?.votes||0;
+      const rivalVotes=a.candidates.find(c=>c.name!==state.candidate)?.votes||0;
+      const pct=100*personal/a.validVotes;
+      state.apuracao=null;
+      state.lastElection={kind:"majoritarian",validVotes:a.validVotes};
+      return concludeElection(personal>rivalVotes,pct,2);
+    }
+    if(a.proportional){
+      const p=a.proportional;
+      state.lastElection={...p,kind:"proportional",office:state.office};
+      const ownPercent=100*p.votes/a.validVotes;
+      addNews("Apuração proporcional concluída",`${p.party}: ${p.partySeats} de ${p.seats} cadeiras; QE fictício de ${fmtVotes(p.qe)} votos.`);
+      state.apuracao=null;
+      return concludeElection(p.elected,ownPercent,1);
+    }
+    if(a.office==="senador"){
+      const seats=a.slots;
       state.lastElection={kind:"senate",seats};
-      return concludeElection(estimates.slice(0,seats).some(c=>c.name===state.candidate),own.votes,1);
+      const own=a.candidates.find(c=>c.name===state.candidate);
+      const elected=a.candidates.slice().sort((x,y)=>y.votes-x.votes).slice(0,seats).some(c=>c.name===state.candidate);
+      state.apuracao=null;
+      return concludeElection(elected,100*own.votes/a.validVotes,1);
     }
-    if (!hasRunoff()) return concludeElection(estimates[0].name===state.candidate,own.votes,1);
-    if (estimates[0].votes>50) return concludeElection(estimates[0].name === state.candidate,own.votes,1);
-    const finalist=estimates.slice(0,2);
-    if(!finalist.some(c=>c.name===state.candidate)) return concludeElection(false,estimates.find(c=>c.name===state.candidate).votes,1);
-    state.phase="runoff";
-    state.runoffRival=finalist.find(c=>c.name!==state.candidate).name;
-    state.energy=3;
-    state.week=2;
+    const sorted=a.candidates.slice().sort((x,y)=>y.votes-x.votes);
+    const own=a.candidates.find(c=>c.name===state.candidate);
+    const pct=100*own.votes/a.validVotes;
+    const isWinner=sorted[0].name===state.candidate;
+    if(!hasRunoff() || sorted[0].votes*2>a.validVotes){
+      state.apuracao=null;
+      state.lastElection={kind:"majoritarian",validVotes:a.validVotes};
+      return concludeElection(isWinner,pct,1);
+    }
+    const finalists=sorted.slice(0,2);
+    if(!finalists.some(c=>c.name===state.candidate)){
+      state.apuracao=null;
+      state.lastElection={kind:"majoritarian",validVotes:a.validVotes};
+      return concludeElection(false,pct,1);
+    }
+    state.phase="runoff";state.apuracao=null;
+    state.runoffRival=finalists.find(c=>c.name!==state.candidate).name;
+    state.energy=3;state.week=2;
     state.debateAvailable={id:`${state.campaignNumber}-segundo-turno`,week:2,round:2,title:"Debate do segundo turno"};
-    state.runoffBase=clamp(50+(estimates.find(c=>c.name===state.candidate).votes - finalist.find(c=>c.name!==state.candidate).votes)*.55,32,68);
-    addNews("Segundo turno confirmado",`Disputa final contra ${state.runoffRival} em duas rodadas decisivas.`);
-    showDecision("Segundo turno",`Sua candidatura enfrentará ${state.runoffRival}. As duas próximas semanas serão decisivas.`,"Continuar",()=>navTo("overview"));
+    const rival=finalists.find(c=>c.name!==state.candidate);
+    state.runoffBase=clamp(50+(pct-100*rival.votes/a.validVotes)*.55,32,68);
+    addNews("Segundo turno confirmado",`Apuração concluída. Sua candidatura enfrentará ${state.runoffRival} em duas rodadas decisivas.`);
+    showDecision("Segundo turno",`A apuração do primeiro turno terminou. Você enfrentará ${state.runoffRival}. O novo debate já está disponível.`,"Continuar",()=>navTo("overview"));
     renderAll();
   }
 
-  function runoffElection() {
-    if (state.week>1) {
-      state.runoffBase=clamp(state.runoffBase+(nationalSupport()-25)/25+rnd(-1.5,1.5),25,75);
-      state.week--;
-      state.energy=3;
-      addNews("Pesquisa de segundo turno",`Disputa permanece competitiva contra ${state.runoffRival}.`);
-      renderAll(); return;
-    }
-    const share=clamp(state.runoffBase+(state.reputation-50)/30+state.media/22+rnd(-2,2),15,85);
-    state.electionHistory.push({round:2,office:state.office,district:state.district,year:state.electionYear,campaign:state.campaignNumber,results:[{name:state.candidate,votes:round1(share)},{name:state.runoffRival,votes:round1(100-share)}]});
-    concludeElection(share>50,share,2);
+  function renderApuracao(){
+    const el=$("apuracaoContent");if(!el)return;
+    const archive=state.apuracaoHistory||[];
+    const idx=Number.isInteger(state.apuracaoArchiveIndex)&&state.apuracaoArchiveIndex>=0&&state.apuracaoArchiveIndex<archive.length?state.apuracaoArchiveIndex:archive.length-1;
+    const a=state.apuracao||archive[idx];
+    if(!a){el.innerHTML=`<div class="panel"><h3>Apuração aguardando eleição</h3><p>Conclua as semanas da campanha para começar a contagem de votos. O relógio aparecerá às 17h no dia da eleição.</p></div>`;return;}
+    const active=state.phase==="counting"&&!!state.apuracao;
+    const snapshot=a.snapshots[a.hourIndex], counted=snapshot.counts;
+    const processed=snapshot.voters*a.slots;
+    const validCount=counted.slice(0,a.candidates.length).reduce((x,y)=>x+y,0);
+    const blanks=counted[a.candidates.length],nulls=counted[a.candidates.length+1];
+    const countedPercentage=100*processed/(a.turnout*a.slots);
+    const totalVotes=a.candidates.map((c,i)=>({...c,votes:counted[i],share:validCount?100*counted[i]/validCount:0})).sort((x,y)=>y.votes-x.votes);
+    const isProp=["deputado_federal","deputado_estadual","vereador"].includes(a.office);
+    const electionText=`${safeText(officeNames[a.office]||a.office)} · ${safeText(a.district)} · ${a.round}º turno · ${a.electionYear}`;
+    const list=totalVotes.map((c,i)=>`<div class="count-candidate ${c.name===state.candidate?'mine':''}"><div class="count-label"><span><strong>${safeText(c.name)}</strong><small>${safeText(c.party)}${c.name===state.candidate?' · Você':''}</small></span><span><strong>${fmtVotes(c.votes)} votos</strong><small>${c.share.toFixed(2).replace('.',',')}% válidos</small></span></div><div class="poll-track"><div class="poll-fill" style="width:${clamp(c.share,0,100)}%"></div></div></div>`).join("");
+    const currentTitle=active?`Apuração ao vivo · ${snapshot.hour}`:`Última apuração · ${snapshot.hour}`;
+    const finished=a.hourIndex===7;
+    const archiveNav=!active&&archive.length>1?`<div class="panel count-archives"><label><span>Apurações anteriores</span><select aria-label="Escolher eleição arquivada" onchange="window.__game.selectApuracaoArchive(this.value)">${archive.map((past,i)=>`<option value="${i}" ${i===idx?"selected":""}>${safeText(past.electionYear)} — ${safeText(officeNames[past.office]||past.office)} / ${safeText(past.district)} — ${past.round}º turno</option>`).join("")}</select></label></div>`:"";
+    el.innerHTML=`
+      ${archiveNav}
+      <div class="count-hero"><div><p class="eyebrow">ELEIÇÃO SIMULADA · APURAÇÃO MANUAL</p><h3>${currentTitle}</h3><p>${electionText}</p></div><div class="count-clock">${snapshot.hour}</div></div>
+      <div class="count-timeline">${APURACAO_HOURS.map((h,i)=>`<div class="count-time ${i===a.hourIndex?'now':''} ${i<a.hourIndex?'done':''}"><span>${h}</span><div></div></div>`).join("")}</div>
+      <div class="count-progress"><div class="progress-head"><span>Votos apurados</span><strong>${countedPercentage.toFixed(1).replace('.',',')}%</strong></div><div class="progress-track"><div class="progress-value" style="width:${countedPercentage}%"></div></div></div>
+      <div class="count-metrics">
+        <div class="metric-card"><span>Eleitores aptos</span><strong>${fmtVotes(a.registered)}</strong></div>
+        <div class="metric-card"><span>Comparecimento apurado</span><strong>${fmtVotes(snapshot.voters)}</strong><small>${(100*snapshot.voters/a.registered).toFixed(2).replace('.',',')}% dos eleitores aptos</small></div>
+        <div class="metric-card"><span>Votos válidos apurados</span><strong>${fmtVotes(validCount)}</strong></div>
+        <div class="metric-card"><span>Brancos</span><strong>${fmtVotes(blanks)}</strong><small>${(100*blanks/processed).toFixed(2).replace('.',',')}% dos votos apurados</small></div>
+        <div class="metric-card"><span>Nulos</span><strong>${fmtVotes(nulls)}</strong><small>${(100*nulls/processed).toFixed(2).replace('.',',')}% dos votos apurados</small></div>
+        <div class="metric-card"><span>${finished?'Faltaram / abstenções':'Ainda não apurados ou ausentes'}</span><strong>${fmtVotes(finished?a.abstentions:a.registered-snapshot.voters)}</strong><small>${finished?(100*a.abstentions/a.registered).toFixed(2).replace('.',',')+'% dos eleitores aptos':'Inclui votos ainda não apurados'}</small></div>
+      </div>
+      <div class="count-columns"><div class="panel"><div class="panel-head"><div><p class="eyebrow">PLACAR ELEITORAL</p><h3>Votação por candidato</h3></div><span class="badge">${totalVotes.length} candidaturas</span></div><div class="count-list">${list}</div></div>
+      <div class="panel count-aside"><p class="eyebrow">BOLETIM ELEITORAL</p><h3>${finished?'100% apurado':'Apuração em andamento'}</h3><p>Boletins simulados são liberados hora a hora. Percentuais de candidatos usam somente os votos válidos; brancos e nulos são exibidos separadamente.</p>
+      <p><b>${fmtVotes(processed)}</b> voto(s) totalizados nesta simulação.${a.slots>1?` Cada eleitor pode registrar ${a.slots} votos para o Senado; os votos não equivalem ao número de pessoas.`:''}</p>
+      <p>${finished?`Comparecimento final: ${fmtVotes(a.turnout)} eleitores. Não compareceram: ${fmtVotes(a.abstentions)}. Total de opções computadas: ${fmtVotes(a.turnout*a.slots)}.`:`Faltam etapas da contagem. Antes de 00h, o número de eleitores ainda não apurados inclui também quem não compareceu; a abstenção final só será conhecida ao término.`}</p>
+      ${isProp?`<p>A distribuição de cadeiras usa uma fórmula proporcional fictícia. A lista mostra os candidatos simulados e seus votos nominais; não é uma apuração do TSE.</p>`:''}
+      ${active?`<button class="btn btn-primary full" onclick="window.__game.advanceApuracao()">${finished?'Concluir apuração e divulgar resultado':`Avançar para ${APURACAO_HOURS[a.hourIndex+1]}`}</button>`:`<p class="count-closed">Apuração encerrada e arquivada no histórico da carreira.</p>`}
+      </div></div>
+      <p class="map-caption">Todos os números são fictícios. A distribuição foi fixada ao iniciar a apuração e permanece idêntica após salvar/carregar o jogo. Horários de 17h a 00h são etapas de jogo, não representam horário oficial de divulgação.</p>`;
   }
 
   function showDecision(title,text,button,callback) {
@@ -829,9 +1037,9 @@
     $("mediaMetric").textContent = `${state.media >= 0 ? "+" : ""}${round1(state.media)}`;
     $("mediaMetric").className = state.media > 2 ? "positive" : state.media < -2 ? "negative" : "";
     $("groundMetric").textContent = Math.round(state.ground);
-    $("weekDisplay").textContent = state.phase === "government" ? `${state.administration.month}/${state.administration.maxMonths}` : state.week;
+    $("weekDisplay").textContent = state.phase === "government" ? `${state.administration.month}/${state.administration.maxMonths}` : state.phase==="counting"?"Dia da eleição":state.week;
     $("energyDisplay").textContent = `${state.energy}/${state.maxEnergy}`;
-    $("campaignPhase").textContent = state.phase === "government" ? `MANDATO · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"}` : state.phase === "runoff" ? "SEGUNDO TURNO" : state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
+    $("campaignPhase").textContent = state.phase === "government" ? `MANDATO · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"}` : state.phase === "counting" ? "DIA DA ELEIÇÃO · APURAÇÃO DOS VOTOS" : state.phase === "runoff" ? "SEGUNDO TURNO" : state.week > 16 ? "PRÉ-CAMPANHA NACIONAL" : state.week > 5 ? "CAMPANHA NACIONAL" : "RETA FINAL";
     $("trendBadge").textContent = Math.abs(delta) < .15 ? "estável" : delta > 0 ? `+${round1(delta)} p.p.` : `${round1(delta)} p.p.`;
     $("trendBadge").className = `badge ${delta > .15 ? "positive" : delta < -.15 ? "negative" : ""}`;
 
@@ -847,12 +1055,13 @@
     renderGovernment();
     renderCareer();
     renderDebate();
+    renderApuracao();
     renderBrazilMap();
     const rivalPanel=$("rivalActivity");
     if(rivalPanel)rivalPanel.innerHTML=(state.rivalActivity||[]).length?(state.rivalActivity||[]).slice(0,6).map(x=>`<div class="news-item"><strong>${safeText(x.title)}</strong><p>${safeText(x.text)}</p></div>`).join(""):`<p class="muted-text">A atividade dos adversários aparecerá após a primeira semana.</p>`;
     $("pollLabel").textContent = state.phase === "government" ? "Apoio da última campanha" : "Intenção de voto simulada";
     $("pollRaceTitle").textContent = `Disputa: ${officeNames[state.office]||"Presidente"}`;
-    $("nextTurn").textContent=state.phase==="ended"?"Disputar outra eleição":(state.debateAvailable||state.pendingDebate)?"Participar do debate":state.phase==="government"?"Avançar um mês":state.phase==="runoff"?"Avançar segundo turno":"Avançar uma semana";
+    $("nextTurn").textContent=state.phase==="counting"?(state.apuracao?.hourIndex===7?"Concluir apuração":`Avançar para ${APURACAO_HOURS[(state.apuracao?.hourIndex||0)+1]}`):state.phase==="ended"?"Disputar outra eleição":(state.debateAvailable||state.pendingDebate)?"Participar do debate":state.phase==="government"?"Avançar um mês":state.phase==="runoff"?"Avançar segundo turno":"Avançar uma semana";
     writeSave(false);
   }
 
@@ -1187,7 +1396,7 @@
     state.municipality=(draft.office==="vereador"||draft.office==="prefeito")?city:"";
     state.district = state.office==="presidente"?"Brasil":
        (state.office==="prefeito"||state.office==="vereador")?`${city} / ${draft.uf}`:draft.uf;
-    state.phase="campaign";state.finished=false;state.week=24;state.turns=0;
+    state.phase="campaign";state.finished=false;state.week=24;state.turns=0;state.apuracao=null;
     state.energy=state.maxEnergy||3;
     // Caixa de campanha é reiniciado; orçamento do mandato anterior jamais vira verba eleitoral.
     state.partyProfile=newPartyProfile(state.party);
@@ -1381,6 +1590,11 @@
       <div class="career-history">${past.length?past.map(h=>`<div class="career-record"><div><strong>${safeText(h.title)}</strong><small>${safeText(officeNames[h.office]||h.office)} · ${safeText(h.district)} · Campanha ${h.campaign||1}</small></div><div class="career-meta"><span class="badge">Saldo ${h.score>=0?"+":""}${round1(h.score)}</span><small>${h.answers?.length||0} respostas</small></div></div>`).join(""):"<p>Nenhuma participação registrada.</p>"}</div></div>`;
   }
 
+  function selectApuracaoArchive(value){
+    const i=Number(value);if(!Number.isInteger(i)||i<0||i>=(state.apuracaoHistory||[]).length)return;
+    state.apuracaoArchiveIndex=i;renderAll();navTo("apuracao");
+  }
+
   function ideologyLabel(v) {
     return {
       centro: "Centro pragmático",
@@ -1431,7 +1645,11 @@
     state.office ??= "presidente";
     state.district ??= "Brasil";
       state.phase ??= state.finished ? "ended":"campaign";
-      state.version = 7;
+      state.version = 8;
+      state.apuracao ??= null;
+      state.apuracaoHistory ??= [];
+      state.apuracaoArchiveIndex ??= null;
+      if(state.phase==="counting" && (!state.apuracao?.snapshots?.length || !Number.isInteger(state.apuracao.hourIndex)))throw new Error("Apuração inválida");
       state.careerHistory ??= [];
       state.careerDraft ??= null;
       state.campaignNumber ??= 1;
@@ -1530,7 +1748,8 @@
       integrity: "Integridade",
       government: "Mandato",
       career: "Carreira",
-      debate: "Debate ao vivo"
+      debate: "Debate ao vivo",
+      apuracao: "Apuração"
     };
     $("pageTitle").textContent = labels[view];
   }
@@ -1569,6 +1788,7 @@
     integrityAction,
     governmentPolicy, cabinetAction,
     openCareer: () => navTo("career"),
-    changeCareerDraft, startNextCampaign, startDebate, answerDebate, partyAction
+    changeCareerDraft, startNextCampaign, startDebate, answerDebate, partyAction,
+    advanceApuracao, selectApuracaoArchive
   };
 })();

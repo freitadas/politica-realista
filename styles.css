@@ -476,3 +476,19 @@ nav { display: grid; gap: 8px; margin-top: 34px; }
   .action-card{grid-template-columns:minmax(0,1fr);}
   .action-card .btn{justify-self:start;}
 }
+
+/* Apuração eleitoral — versão 8 */
+.count-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:23px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(105deg,rgba(82,214,164,.13),transparent 60%),var(--panel)}
+.count-hero h3{font-size:27px;margin:7px 0}.count-hero p:last-child{color:var(--muted);font-size:13px;margin:0}.count-clock{font-variant-numeric:tabular-nums;color:var(--accent);font-size:43px;font-weight:900;white-space:nowrap}
+.count-timeline{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;margin:16px 0 10px}.count-time{color:var(--muted);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}.count-time div{height:7px;border-radius:30px;background:#28334d;margin-top:7px}.count-time.done div{background:#5c9e87}.count-time.now{color:var(--text);font-weight:800}.count-time.now div{background:var(--accent)}
+.count-progress{margin:12px 0 18px}.count-progress .progress-head{margin-bottom:8px}
+.count-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:15px}.count-metrics .metric-card strong{font-size:clamp(16px,2.3vw,26px);overflow-wrap:anywhere}
+.count-columns{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.8fr);gap:15px}.count-list{max-height:550px;overflow-y:auto;margin-top:18px;display:grid;gap:12px;padding-right:5px}
+.count-candidate{padding:9px 10px;background:#11192b;border-radius:11px}.count-candidate.mine{border:1px solid var(--accent)}
+.count-label{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:9px}.count-label>span:last-child{text-align:right;white-space:nowrap}
+.count-label strong{font-size:12px;display:block}.count-label small{font-size:11px;color:var(--muted);display:block;margin-top:3px}.count-aside{display:flex;flex-direction:column;gap:9px}.count-aside p:not(.eyebrow){font-size:12px;color:var(--muted);line-height:1.55}.count-aside button{margin-top:auto}.count-closed{border:1px solid var(--line);border-radius:11px;padding:10px}
+@media(max-width:960px){.count-columns{grid-template-columns:1fr}}
+@media(max-width:680px){.count-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.count-hero{padding:16px}.count-hero h3{font-size:19px}.count-clock{font-size:28px}.count-time{font-size:9px}.count-timeline{gap:2px}}
+@media(max-width:400px){.count-metrics{grid-template-columns:minmax(0,1fr)}.count-label{flex-wrap:wrap}.count-label>span:last-child{text-align:left}}
+
+.count-archives{margin-bottom:14px}.count-archives label{max-width:690px}

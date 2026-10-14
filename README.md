@@ -1,4 +1,4 @@
-# Mandato v7 — Carreira, eleições e governo (simulação brasileira)
+# Mandato v8 — Carreira, eleições e governo (simulação brasileira)
 
 **Jogo de navegador estático (HTML, CSS e JavaScript).** Não utiliza backend, não exige instalação e pode ser publicado em um Static Site do Render.
 
@@ -36,7 +36,7 @@
 
 ## Resultados dos testes
 
-A versão passou por 17 cenários principais e verificações adicionais (partidos, migração da v6, pesos estaduais e largura de celular) em Chromium automatizado, sem erros JavaScript na página: prefeito sem/com segundo turno, derrota no primeiro turno, três eleições proporcionais, Senado, mandato legislativo, carreira entre estados/partidos, debate com réplica salvo/carregado, evento pendente salvo/carregado, e botão de salvamento no celular. Verificação de sintaxe JS, ausência de IDs HTML duplicados e integridade do ZIP realizadas à parte.
+A base v7 passou por 17 cenários principais e verificações adicionais (partidos, migração da v6, pesos estaduais e largura de celular) em Chromium automatizado, sem erros JavaScript na página: prefeito sem/com segundo turno, derrota no primeiro turno, três eleições proporcionais, Senado, mandato legislativo, carreira entre estados/partidos, debate com réplica salvo/carregado, evento pendente salvo/carregado, e botão de salvamento no celular. Verificação de sintaxe JS, ausência de IDs HTML duplicados e integridade do ZIP realizadas à parte.
 
 ## Fontes normativas para o desenho das regras
 
@@ -53,3 +53,23 @@ Os nomes dos partidos e de algumas pessoas públicas são reais, mas **nada que 
 O sistema proporcional é uma aproximação com votos inventados e não cobre integralmente quóruns, federações, inelegibilidades, sobras, faixas de votação e demais particularidades. A distribuição de cadeiras municipais é arbitrária na simulação, não reflete automaticamente os limites legais exatos de cada município. O calendário de carreira é simplificado; executar mandatos ou se candidatar novamente não equivale a observar a legislação real de desincompatibilização. Os indicadores de gestão são abstratos.
 
 O jogo **não possui contas, sincronização em nuvem nem banco de dados**. O progresso é armazenado por navegador e origem (`localStorage`); o arquivo JSON é o meio de transferir o progresso para outro dispositivo. O mapa geográfico verdadeiro depende de carregamento externo; quando não disponível, o cartograma esquemático funciona offline.
+
+
+## Novidade da versão 8 — Apuração eleitoral, 17h–00h
+
+- Inicia automaticamente quando termina a campanha e a eleição ocorre (inclusive segundo turno).
+- Aba **Apuração eleitoral** com horários 17h, 18h, 19h, 20h, 21h, 22h, 23h e 00h; cada horário avança com um clique.
+- Apresenta eleitores aptos, comparecimento apurado, votos válidos, votos individuais por candidato, percentuais dos votos válidos, brancos, nulos e, às 00h, abstenções definitivas.
+- Antes do fim, o campo "Ainda não apurados ou ausentes" **não** é chamado de abstenção, pois inclui votos ainda não processados.
+- Salva os totais finais e a distribuição de cada hora, sem recálculo ao recarregar; permite continuar a apuração após fechar a página.
+- Arquiva as apurações anteriores, que podem ser vistas na aba, e integra os resultados às carreiras, eleições majoritárias, Senado e eleições proporcionais simuladas.
+- Nas eleições proporcionais, os votos nominais e o quociente partidário usam a mesma base simulada de votos válidos; nos anos em que se disputam duas vagas no Senado, cada eleitor tem duas opções de voto na simulação.
+- Todos os números e horários são **fictícios**, para o jogo. Não são resultados oficiais nem estimativas sobre eleições reais.
+
+
+### Testes específicos da v8
+
+- 35 simulações do motor de apuração, cinco para cada cargo, incluindo conservação de votos por horário, início às 17h e encerramento às 00h.
+- Simulações adicionais de vitória, derrota e segundo turno.
+- Teste real em Chromium com primeiro e segundo turno, visualização de históricos e seletor de eleições anteriores.
+- Teste visual de tela mobile com viewport de 375 px; nenhum erro JavaScript observado nos fluxos testados.

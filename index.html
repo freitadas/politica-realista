@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101624" />
   <meta name="description" content="Simulador de eleições brasileiras em cenário fictício com carreira, debates e gestão pública." />
-  <title>Mandato v7 — Simulador Político</title>
+  <title>Mandato v8 — Simulador Político</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -120,6 +120,7 @@
           <button class="nav-item" data-view="integrity">Integridade</button>
           <button class="nav-item" data-view="government">Mandato</button>
           <button class="nav-item" data-view="debate">Debate ao vivo</button>
+          <button class="nav-item" data-view="apuracao">Apuração eleitoral</button>
           <button class="nav-item" data-view="career">Carreira</button>
         </nav>
 
@@ -236,6 +237,7 @@
             </div>
           </section>
 
+          <section id="apuracaoView" class="view"><div class="section-lead"><div><p class="eyebrow">BOLETIM DE URNAS</p><h3>Dia da eleição</h3></div><p>Avance manualmente das 17h às 00h para acompanhar a contagem dos votos.</p></div><div id="apuracaoContent"></div></section>
           <section id="careerView" class="view">
             <div class="section-lead"><div><p class="eyebrow">TRAJETÓRIA POLÍTICA</p><h3>Minha carreira</h3></div><p>Depois de vencer uma eleição, você poderá lançar uma nova candidatura a outro cargo ou em outro estado. O histórico permanece salvo.</p></div>
             <div id="careerContent"></div>
