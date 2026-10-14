@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101624" />
   <meta name="description" content="Simulador de eleições brasileiras em cenário fictício com carreira, debates e gestão pública." />
-  <title>Mandato v8 — Simulador Político</title>
+  <title>Mandato v9 — Simulador Político Integral</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -16,7 +16,7 @@
           <div class="brand-mark">M</div>
           <div>
             <p class="eyebrow">SIMULADOR POLÍTICO</p>
-            <h1>Mandato</h1>
+            <h1>Mandato <span class="v9-tag">v9</span></h1>
           </div>
         </div>
 
@@ -39,6 +39,7 @@
           <label id="electorateSelectLabel" class="hidden"><span>Eleitorado simulado do município</span><input id="electorateChoice" type="number" min="1000" max="15000000" step="1" value="300000" /></label>
         </div>
         <div class="setup-grid">
+          <label id="customPartyLabel" class="hidden"><span>Nome do partido fictício</span><input id="customPartyName" maxlength="32" placeholder="Ex.: Renovação Cidadã" value="Renovação Cidadã" /></label>
           <label>
             <span>Nome do candidato</span>
             <input id="candidateName" type="text" value="Alex Moreira" maxlength="28" />
@@ -83,6 +84,7 @@
               <option value="MISSÃO">Missão</option>
               <option value="REDE">Rede Sustentabilidade</option>
               <option value="PV">Partido Verde</option>
+              <option value="FICTICIO">Criar partido fictício</option>
             </select>
           </label>
         </div>
@@ -90,10 +92,12 @@
         <div class="setup-actions">
           <button id="startGame" class="btn btn-primary">Começar campanha</button>
           <button id="loadGameSetup" class="btn btn-ghost">Continuar campanha</button>
+          <button id="manageSavesSetup" class="btn btn-ghost">Outras carreiras</button>
           <button id="importGameSetup" class="btn btn-ghost">Importar backup</button>
         </div>
 
         <input type="file" id="backupFile" accept=".json,application/json" class="hidden" aria-label="Arquivo de backup do jogo" />
+        <div id="setupSlotList" class="setup-slot-list"></div>
         <div class="setup-note">
           Cenário de história alternativa. Partidos e algumas personalidades são reais, mas pesquisas, ações dos oponentes, resultados, processos e eventos são inventados. Regras de campanha, elegibilidade e distribuição de cadeiras são aproximações didáticas.
         </div>
@@ -122,6 +126,9 @@
           <button class="nav-item" data-view="debate">Debate ao vivo</button>
           <button class="nav-item" data-view="apuracao">Apuração eleitoral</button>
           <button class="nav-item" data-view="career">Carreira</button>
+          <button class="nav-item" data-view="electorate">Eleitorado</button>
+          <button class="nav-item" data-view="cabinet">Gabinete e Congresso</button>
+          <button class="nav-item" data-view="saves">Salvamentos</button>
         </nav>
 
         <div class="sidebar-bottom">
@@ -139,6 +146,7 @@
           </div>
           <div class="top-meta">
             <button id="saveGameTop" class="btn btn-ghost">Salvar</button>
+            <button id="showSavesTop" class="btn btn-ghost">Carreiras</button>
             <button id="exportGameTop" class="btn btn-ghost">Backup</button>
             <div class="meta-box">
               <span>Semana</span>
@@ -237,6 +245,9 @@
             </div>
           </section>
 
+          <section id="electorateView" class="view"><div class="section-lead"><div><p class="eyebrow">SEGMENTOS FICTÍCIOS</p><h3>Humor do eleitorado</h3></div><p>Grupos agregados simulados, sem perfis de pessoas reais. Os valores influenciam a dinâmica do jogo e não são pesquisas eleitorais.</p></div><div id="electorateContent"></div></section>
+          <section id="cabinetView" class="view"><div class="section-lead"><div><p class="eyebrow">INSTITUIÇÕES</p><h3>Gabinete, comissões e crises</h3></div><p>Nomeações fictícias, controle parlamentar, debates orçamentários e crises institucionais no exercício do mandato.</p></div><div id="cabinetContent"></div></section>
+          <section id="savesView" class="view"><div class="section-lead"><div><p class="eyebrow">DADOS DO JOGADOR</p><h3>Minhas carreiras</h3></div><p>Até cinco carreiras no dispositivo, backup JSON e opção de sincronização com serviço próprio.</p></div><div id="savesContent"></div></section>
           <section id="apuracaoView" class="view"><div class="section-lead"><div><p class="eyebrow">BOLETIM DE URNAS</p><h3>Dia da eleição</h3></div><p>Avance manualmente das 17h às 00h para acompanhar a contagem dos votos.</p></div><div id="apuracaoContent"></div></section>
           <section id="careerView" class="view">
             <div class="section-lead"><div><p class="eyebrow">TRAJETÓRIA POLÍTICA</p><h3>Minha carreira</h3></div><p>Depois de vencer uma eleição, você poderá lançar uma nova candidatura a outro cargo ou em outro estado. O histórico permanece salvo.</p></div>

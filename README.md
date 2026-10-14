@@ -1,75 +1,67 @@
-# Mandato v8 — Carreira, eleições e governo (simulação brasileira)
+# Mandato v9 — Versão Integral
 
-**Jogo de navegador estático (HTML, CSS e JavaScript).** Não utiliza backend, não exige instalação e pode ser publicado em um Static Site do Render.
+Jogo de estratégia política em HTML, CSS e JavaScript. A versão 9 reúne, em **um único pacote**, as melhorias de eleições, debates, partido, adversários, mandato, carreira, eleitorado, integridade, mapa, apuração e salvamento.
 
-## Mudanças em relação à v6
+**Importante:** todas as porcentagens, resultados, promessas, eventos, investigações, apoios e ações atribuídas a candidaturas são inteiramente **simulados**. Não são pesquisas, notícias, acusações ou resultados oficiais sobre qualquer pessoa ou legenda real. Os cálculos legislativos, eleitorais e econômicos são aproximações didáticas, não simulador jurídico completo.
 
-- Correção de apuração: o percentual de derrota sempre pertence ao jogador, não ao candidato que ficou em primeiro lugar.
-- Segundo turno: presidente, governador e prefeito de município **com mais de 200 mil eleitores** (eleitorado informado pelo jogador para a simulação). Senado e municípios de até 200 mil eleitores têm turno único.
-- Senado: simulação com duas vagas no ciclo 2026 e uma no ciclo 2030, alternando a cada quatro anos. Mandato simulado de 96 meses.
-- Cargos proporcionais: substituição da regra errada de 15% por distribuição didática com quociente eleitoral, quociente partidário, listas nominais e sobras por médias. Todos os votos, cadeiras municipais, listas e quocientes são gerados na partida — **não são uma apuração oficial nem reproduzem todas as exceções legais**.
-- 27 unidades federativas: os pesos fictícios são normalizados para aproximadamente 100%. Mapa clicável de regiões. Usa cartograma esquemático offline; quando o navegador consegue carregar GeoJSON público CC0, apresenta os limites geográficos estaduais.
-- Campanha: os adversários agora praticam ações semanais simuladas com despesas próprias; painel de atividades na aba Mídia.
-- Partido: organização, coesão, controle de contas e formação de quadros (atributos totalmente fictícios). Possibilidade de organizar diretórios, convenção e auditoria interna na aba Alianças. Mudança de legenda ao iniciar outra candidatura.
-- Debate: quatro perguntas por debate, com escolha de respostas e **réplica para cada pergunta**; impactos dependem de preparação, temas, orientação escolhida e aleatoriedade. Salva tanto a resposta quanto a fase de réplica.
-- Exercício do mandato: ações diferentes por esfera e Poder. Chefes do Executivo administram políticas públicas; parlamentares propõem leis, participam de votação e fiscalização, sem usar diretamente orçamento do Executivo.
-- Carreira: calendário de eleições simuladas (ciclos gerais 2026/2030 etc. e municipais 2028/2032 etc.), histórico de eleições e mandatos, candidatura em outro estado ou cargo. Mudança de cargo durante mandato executivo exibe advertência sobre renúncia simulada; regras reais de filiação, prazos e desincompatibilização não são modeladas integralmente.
-- Salvar/carregar: preserva recursos, debates, eventos políticos pendentes, histórico e decisões; aceita saves legados v5/v6, com migração. Backup JSON pode ser exportado e importado manualmente.
-- Render: `render.yaml` corrigido para `staticPublishPath: .` (arquivos na raiz).
+## O que está implementado
 
-## Publicar no GitHub e Render
+- **7 cargos:** presidente, governador, senador, deputado federal, deputado estadual/distrital, prefeito e vereador.
+- **Estados e municípios:** 26 estados e DF; mapa interativo cartográfico esquemático offline e opção de malha geográfica online.
+- **Campanhas:** 24 semanas, orçamento, reputação, imprensa, organização territorial, arrecadação e propaganda.
+- **Partidos:** siglas reais identificadas por seus nomes; atributos internos fictícios, convenção, organização, auditoria, disputa de liderança, formação de quadros e criação de partido *fictício* com nome escolhido.
+- **Adversários:** rotinas simuladas de publicidade, visitas, alianças e movimentações de recursos. Atributos internos **não** reproduzem avaliações reais de políticos.
+- **Debates:** perguntas por campanha, resposta, réplica e tréplica, consequências contextuais, agenda de debates e salvamento no meio do evento.
+- **Eleitorado:** seis grupos agregados por prioridades públicas fictícias; confiança e engajamento variam com políticas e repercutem no apoio regional de novas rodadas.
+- **Apuração:** das 17h às 00h, avanço manual, votos por candidatura, porcentagens, brancos, nulos, abstenções, comparecimento e boletins fictícios. No pleito presidencial há quadro de avanço por UF. O resultado é gerado uma única vez por eleição, então avançar ou recarregar não muda o resultado final.
+- **Mandato:** ações distintas para Executivo e Legislativo, política econômica, serviços públicos, projetos, votações, articulação parlamentar e crises simuladas.
+- **Gabinete e Congresso:** escolha entre assessores e secretários inventados, audiências, fiscalização, orçamento e série temporal de aprovação.
+- **Carreira:** disputar outro cargo/estado, mudar de partido e levar reputação acumulada e histórico para eleições futuras.
+- **Corrupção e integridade:** eventos fictícios com fiscalização, riscos, investigação e consequência. Não são acusações a partidos ou personalidades reais.
+- **Dados:** salvamento automático local, backup JSON, migração de salvamentos antigos e cinco espaços de carreira no mesmo navegador.
+- **Contas e nuvem opcionais:** backend Node/PostgreSQL incluído na pasta `cloud-server`, com login, 5 carreiras por conta, envio e restauração manual. Exige outro serviço e banco PostgreSQL configurados no Render; não está hospedado automaticamente.
 
-1. Extraia o ZIP e envie **todos os arquivos diretamente à raiz** do repositório `freitadas/politica-realista`, substituindo os anteriores. Não envie a pasta que contém os arquivos.
-2. Faça commit na branch `main`.
-3. Mantenha no Render: **Static Site**, Branch `main`, **Build Command** `echo "Static site ready"` e **Publish Directory** `.`.
-4. Caso Auto-Deploy não esteja ativo, selecione **Manual Deploy → Deploy latest commit**.
-5. Se um salvamento anterior estiver neste mesmo navegador e endereço, use **Continuar campanha**. Como segurança, **Baixar backup** antes de atualizações maiores.
+## Como atualizar o site que já funciona no Render
 
-## Arquivos
+1. Na partida atual, clique em **Baixar backup** e guarde o arquivo JSON.
+2. Extraia este ZIP.
+3. Envie `index.html`, `app.js`, `styles.css`, `render.yaml` e `README.md` **diretamente à raiz** do repositório `freitadas/politica-realista`, sobrescrevendo os anteriores. A pasta `cloud-server` é opcional; pode ser enviada para guardar o código do backend.
+4. Faça commit na branch `main`.
+5. No Render, mantenha **Static Site**, Build Command `echo "Static site ready"` e Publish Directory `.`. Caso o Auto-Deploy esteja desativado, execute **Manual Deploy → Deploy latest commit**.
+6. Abra o site, teste o carregamento da carreira anterior e confira o botão **Carreiras** ou a aba **Salvamentos**.
 
-- `index.html` — interface e abas.
-- `styles.css` — aparência, layout e dispositivos móveis.
-- `app.js` — motor da simulação, eleições, carreiras, debates, armazenamento.
-- `render.yaml` — implantação estática.
-- `.gitignore` — exclusões.
-- `README.md` — documentação.
+**O jogo principal não necessita de instalação de dependências ou de backend.** É um aplicativo estático.
 
-## Resultados dos testes
+## Habilitar salvamento online entre dispositivos (opcional)
 
-A base v7 passou por 17 cenários principais e verificações adicionais (partidos, migração da v6, pesos estaduais e largura de celular) em Chromium automatizado, sem erros JavaScript na página: prefeito sem/com segundo turno, derrota no primeiro turno, três eleições proporcionais, Senado, mandato legislativo, carreira entre estados/partidos, debate com réplica salvo/carregado, evento pendente salvo/carregado, e botão de salvamento no celular. Verificação de sintaxe JS, ausência de IDs HTML duplicados e integridade do ZIP realizadas à parte.
+1. Crie um PostgreSQL no Render.
+2. Crie um **segundo serviço**, do tipo Web Service / Node, com `Root Directory = cloud-server`, `Build Command = npm install --omit=dev` e `Start Command = npm start`.
+3. Configure as variáveis `DATABASE_URL` (URL interna PostgreSQL), `JWT_SECRET` (segredo aleatório longo, 32 ou mais caracteres) e `CLIENT_ORIGIN` (domínio HTTPS exato do site estático, sem barra final).
+4. O endpoint `https://SEU-BACKEND.onrender.com/api/health` deve retornar `ok: true`.
+5. No jogo, em **Salvamentos**, cole a URL HTTPS do backend, crie uma conta, entre, escolha **Salvar na nuvem** e posteriormente **Ver carreiras na nuvem / Restaurar**.
 
-## Fontes normativas para o desenho das regras
+Provisionamento, custos de serviço, credenciais e administração do banco dependem da sua conta Render. O backend não foi implantado nem validado contra um PostgreSQL externo nesta entrega. Leia `cloud-server/README.md`.
 
-- Tribunal Superior Eleitoral — Sistema majoritário: https://www.tse.jus.br/comunicacao/noticias/2026/Junho/sabe-o-que-e-o-sistema-eleitoral-majoritario-o-glossario-explica-1
-- Tribunal Superior Eleitoral — Quocientes e distribuição proporcional: https://www.tse.jus.br/comunicacao/noticias/2024/Marco/quocientes-eleitoral-e-partidario-entenda-como-um-candidato-a-vereador-e-eleito
-- TSE — Resolução 23.677/2021, compilada e atualizada: https://www.tse.jus.br/legislacao/compilada/res/2021/resolucao-no-23-677-de-16-de-dezembro-de-2021
-- Lei Complementar 64/1990 (e alterações), prazos de renúncia: https://www.tse.jus.br/legislacao/compilada/lei/complementar/lei-complementar-no-64-de-18-de-maio-de-1990
-- Malha estadual GeoJSON (CC0), origem IBGE: https://github.com/henriquemalvar/br-geojson
+## Testes efetuados
 
-## Limitações importantes
+- `node --check app.js` e `node --check cloud-server/server.js` sem erros de sintaxe.
+- Chromium: criar campanha, indicador de eleitorado, liderança partidária, espaço de salvamento local, debate com resposta/réplica/tréplica e retomada, apuração, posse, nomeação de assessor, ação parlamentar, nova candidatura em outro estado e largura de 375 px.
+- Simulações do motor: 35 eleições em 7 cargos, derrota e segundo turno, consistência da soma de votos por hora, brancos/nulos/abstenções.
+- Não houve teste de carga do backend, revisão de acessibilidade integral ou teste público do deploy no Render.
 
-Os nomes dos partidos e de algumas pessoas públicas são reais, mas **nada que ocorre no jogo representa fatos reais**: pesquisas, adversários, desempenhos, corrupção, investigações, eleições e orçamento são inteiramente fictícios. Os atributos partidários são parâmetros inventados de gameplay, não avaliações das legendas.
+## Estrutura
 
-O sistema proporcional é uma aproximação com votos inventados e não cobre integralmente quóruns, federações, inelegibilidades, sobras, faixas de votação e demais particularidades. A distribuição de cadeiras municipais é arbitrária na simulação, não reflete automaticamente os limites legais exatos de cada município. O calendário de carreira é simplificado; executar mandatos ou se candidatar novamente não equivale a observar a legislação real de desincompatibilização. Os indicadores de gestão são abstratos.
+```
+index.html
+styles.css
+app.js
+render.yaml
+README.md
+cloud-server/
+  server.js
+  package.json
+  render-cloud.yaml
+  README.md
+```
 
-O jogo **não possui contas, sincronização em nuvem nem banco de dados**. O progresso é armazenado por navegador e origem (`localStorage`); o arquivo JSON é o meio de transferir o progresso para outro dispositivo. O mapa geográfico verdadeiro depende de carregamento externo; quando não disponível, o cartograma esquemático funciona offline.
-
-
-## Novidade da versão 8 — Apuração eleitoral, 17h–00h
-
-- Inicia automaticamente quando termina a campanha e a eleição ocorre (inclusive segundo turno).
-- Aba **Apuração eleitoral** com horários 17h, 18h, 19h, 20h, 21h, 22h, 23h e 00h; cada horário avança com um clique.
-- Apresenta eleitores aptos, comparecimento apurado, votos válidos, votos individuais por candidato, percentuais dos votos válidos, brancos, nulos e, às 00h, abstenções definitivas.
-- Antes do fim, o campo "Ainda não apurados ou ausentes" **não** é chamado de abstenção, pois inclui votos ainda não processados.
-- Salva os totais finais e a distribuição de cada hora, sem recálculo ao recarregar; permite continuar a apuração após fechar a página.
-- Arquiva as apurações anteriores, que podem ser vistas na aba, e integra os resultados às carreiras, eleições majoritárias, Senado e eleições proporcionais simuladas.
-- Nas eleições proporcionais, os votos nominais e o quociente partidário usam a mesma base simulada de votos válidos; nos anos em que se disputam duas vagas no Senado, cada eleitor tem duas opções de voto na simulação.
-- Todos os números e horários são **fictícios**, para o jogo. Não são resultados oficiais nem estimativas sobre eleições reais.
-
-
-### Testes específicos da v8
-
-- 35 simulações do motor de apuração, cinco para cada cargo, incluindo conservação de votos por horário, início às 17h e encerramento às 00h.
-- Simulações adicionais de vitória, derrota e segundo turno.
-- Teste real em Chromium com primeiro e segundo turno, visualização de históricos e seletor de eleições anteriores.
-- Teste visual de tela mobile com viewport de 375 px; nenhum erro JavaScript observado nos fluxos testados.
+O arquivo `render-cloud.yaml` é um exemplo de configuração do segundo serviço, e **não** substitui o `render.yaml` do Static Site.

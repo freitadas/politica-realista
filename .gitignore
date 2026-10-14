@@ -1,8 +1,6 @@
-# OS / editor
 .DS_Store
 Thumbs.db
-.vscode/
-.idea/
-
-# local
+node_modules/
+.env
+.env.*
 *.log
