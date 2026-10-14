@@ -1,0 +1,30 @@
+name: Gerar cadastros eleitorais TSE
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_rosters.py'
+      - '.github/workflows/cadastros-tse.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Gerar dados oficiais 2024 e 2026
+        run: python scripts/build_rosters.py
+      - name: Publicar cadastros no repositório
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f rosters
+          if ! git diff --cached --quiet; then
+            git commit -m 'data: atualizar cadastros historicos TSE 2024 e 2026'
+            git push
+          fi

@@ -412,12 +412,14 @@
     };
   }
 
-  function startGame() {
+  async function startGame() {
     if(localProfileList().length>=5)return showToast("Cinco carreiras já salvas. Exclua uma antes de iniciar outra.");
     if(["prefeito","vereador"].includes(selectedOffice())) {
+      if($("stateChoice").value==="DF")return showToast("O Distrito Federal não realiza eleições municipais. Selecione outro estado.");
       const elect=Number($("electorateChoice").value);
       if(!Number.isSafeInteger(elect)||elect<1000||elect>15000000)return showToast("Informe eleitorado simulado entre 1.000 e 15 milhões");
     }
+    if(!await requireNationalRoster(selectedOffice(),$("stateChoice").value,$("cityChoice").value.trim()))return;
     state = newState();
     previousNational = nationalSupport();
     $("setup").classList.add("hidden");
@@ -588,44 +590,99 @@
   // Cadastro real histórico: datas, nomes de urna e siglas são referentes à eleição de origem.
   // O jogo NÃO afirma que essas pessoas sejam candidatas em anos futuros; votos são simulados.
   const TSE_CSV_HELP = "https://dadosabertos.tse.jus.br/dataset/candidatos-2024";
+  const CANDIDATE_DATA_ROOT = "rosters";
+  const loadedNationalRosters = new Map();
+  let rosterLoadError = "";
+  let tallyRowsVisible = 30;
+  let tallySearchTerm = "";
   const rosterKey=(office,uf,city)=>`${String(uf||"ES").toUpperCase()}|${normalizeElectoralName(city||"")}|${office}`;
   function normalizeElectoralName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim().replace(/\s+/g," ");}
   function historicalRegistry(office,uf,city){
     const id=rosterKey(office,uf,city);
-    // Imported TSE CSV overrides the bundled historical snapshots for the same district.
+    // Imported official CSV overrides any pre-built historical roster for the same district.
     try{
       const stored=localStorage.getItem(`mandato_tse_roster_${id}`);
       if(stored){const data=JSON.parse(stored);if(data?.members?.length)return data;}
     }catch(err){console.warn("Cadastro eleitoral local indisponível",err);}
-    return window.MANDATO_CANDIDATOS_HISTORICOS?.[id]||null;
+    return loadedNationalRosters.get(id) || window.MANDATO_CANDIDATOS_HISTORICOS?.[id] || null;
+  }
+  function rosterAssetPath(office,uf,city){
+    if(office==="presidente")return `${CANDIDATE_DATA_ROOT}/2026/BR.json`;
+    if(office==="vereador"||office==="prefeito"){
+      const code=normalizeElectoralName(city).replace(/[^A-Z0-9]+/g,"-").replace(/^-|-$/g,"");
+      return `${CANDIDATE_DATA_ROOT}/2024/${String(uf).toUpperCase()}/${code}.json`;
+    }
+    return `${CANDIDATE_DATA_ROOT}/2026/${String(uf).toUpperCase()}.json`;
+  }
+  async function ensureNationalRoster(office,uf,city){
+    const id=rosterKey(office,uf,city);
+    if(loadedNationalRosters.has(id))return true;
+    let imported=false;
+    try { imported=!!JSON.parse(localStorage.getItem(`mandato_tse_roster_${id}`)||'null')?.members?.length; }
+    catch { /* armazenamento indisponível */ }
+    if(imported)return true;
+    const legacy=window.MANDATO_CANDIDATOS_HISTORICOS?.[id];
+    const path=rosterAssetPath(office,uf,city);
+    try {
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),18000);
+      let response;
+      try{response=await fetch(new URL(path,document.baseURI),{signal:controller.signal,cache:"force-cache"});}
+      finally{clearTimeout(timeout);}
+      if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      const source=await response.json();
+      const data=source.offices?.[office];
+      if(!Array.isArray(data) || data.length<2)throw new Error(`Sem candidatos suficientes no arquivo ${path}`);
+      const members=data.filter(v=>Array.isArray(v)&&v[0]&&v[1]).map(([name,party])=>({name,party}));
+      if(members.length<2)throw new Error(`Cadastro insuficiente: ${path}`);
+      loadedNationalRosters.set(id,{members,year:source.year,source:source.source,sourceLabel:source.sourceLabel||"Dados Abertos do TSE"});
+      rosterLoadError="";
+      return true;
+    } catch(err){
+      rosterLoadError=`Não encontrei o cadastro TSE (${office}, ${uf}${city?", "+city:""}): ${err.message}. Gere as bases nacionais durante a publicação no Render ou importe o CSV oficial para esta eleição.`;
+      console.warn(rosterLoadError);
+      if(legacy?.members?.length){
+        console.warn("Usando lista histórica local de cobertura parcial, enquanto os arquivos nacionais não estão publicados.");
+        return true;
+      }
+      return false;
+    }
+  }
+  async function requireNationalRoster(office,uf,city){
+    if(await ensureNationalRoster(office,uf,city))return true;
+    alert(rosterLoadError);
+    return false;
   }
   function officeRegistry(){
     if(!state)return null;
     return historicalRegistry(state.office,state.stateUF,state.municipality);
   }
   function historicOpponents(office,uf,city,player){
-    if(office==="presidente")return opponents.map(o=>({...o}));
     const roster=historicalRegistry(office,uf,city);
-    if(roster && roster.members.length){
-      return roster.members.filter(r=>normalizeElectoralName(r.name)!==normalizeElectoralName(player))
-        .slice(0,office==="prefeito"?6:8).map((r,i)=>({id:`hist${i}`,name:r.name,party:r.party,poll:[30.5,26.2,12.4,8,6,5,4,3][i]}));
-    }
-    // A campanha pode funcionar sem cadastro, mas não inventa vínculo de pessoa real a uma legenda.
-    return fictionalRivals.map((o,i)=>({id:`anon${i}`,name:`Oponente simulado ${i+1}`,party:o.party,poll:o.poll}));
+    if(!roster?.members?.length)return [];
+    // Fixed-size AI opponents for campaign performance. The apuração uses all registered names.
+    return roster.members.filter(r=>normalizeElectoralName(r.name)!==normalizeElectoralName(player))
+      .slice(0,48).map((r,i)=>({id:`hist${i}`,name:r.name,party:r.party,
+        poll:([30.5,26.2,12.4,8,6,5,4,3][i] ?? Math.max(.7,3.0-i*.06))}));
   }
   function rosterDescription(registry){
     return registry?`Nomes históricos ${registry.year}, de ${registry.sourceLabel||'registro eleitoral'}; votação inteiramente simulada.`:
-      `Sem cadastro histórico deste cargo e localidade. Importe um CSV oficial em ${TSE_CSV_HELP} para usar nomes reais.`;
+      `Cadastro TSE ainda não carregado. A publicação precisa gerar o diretório rosters a partir do TSE, ou você pode importar um CSV oficial em ${TSE_CSV_HELP}.`;
   }
   function partyPool(registry,playerParty){
     const grouped=new Map();
+    const seenNames=new Map();
     for(const m of (registry?.members||[])){
       if(!m?.name||!m.party)continue;
       const p=m.party.toUpperCase();
-      if(!grouped.has(p))grouped.set(p,[]);
-      if(!grouped.get(p).some(x=>normalizeElectoralName(x.name)===normalizeElectoralName(m.name)))grouped.get(p).push(m);
+      if(!grouped.has(p)){grouped.set(p,[]);seenNames.set(p,new Set());}
+      const key=normalizeElectoralName(m.name);
+      if(!seenNames.get(p).has(key)){
+        seenNames.get(p).add(key);
+        grouped.get(p).push(m);
+      }
     }
-    const partyIds=[playerParty,...[...grouped.entries()].filter(([p])=>p!==playerParty).sort((a,b)=>b[1].length-a[1].length).map(([p])=>p)].slice(0,registry?12:9);
+    const partyIds=[playerParty,...[...grouped.entries()].filter(([p])=>p!==playerParty).sort((a,b)=>b[1].length-a[1].length).map(([p])=>p)];
     if(!registry)return [playerParty,'PT','PL','PSD','MDB','PSB','UNIÃO','REPUBLICANOS','PDT','NOVO'].filter((x,i,a)=>a.indexOf(x)===i).slice(0,9).map(id=>({id,rows:[]}));
     return partyIds.map(id=>({id,rows:grouped.get(id)||[]}));
   }
@@ -746,8 +803,9 @@
       if(state)navTo('apuracao');
     }catch(e){showToast(e.message||'Erro ao importar CSV');}
   }
-  function restartApuracaoWithRealNames(){
+  async function restartApuracaoWithRealNames(){
     if(!state||state.phase!=='counting'||!state.apuracao)return;
+    if(!await requireNationalRoster(state.office,state.stateUF,state.municipality))return;
     const old=state.apuracao,reg=officeRegistry();
     if(!reg?.members?.length)return showToast('Importe o cadastro eleitoral primeiro');
     if(!confirm('Recriar a apuração com nomes históricos reais? A contagem volta às 17h e novos totais serão simulados. Seu histórico de carreira continuará salvo.'))return;
@@ -855,8 +913,23 @@
     return snapshots;
   }
 
-  function startApuracao(round){
+  async function startApuracao(round){
     if(state.apuracao && state.phase==="counting"){navTo("apuracao");return;}
+    if(!await requireNationalRoster(state.office,state.stateUF,state.municipality))return;
+    // Repair anonymous/legacy opponent lists without changing archived election totals.
+    const known=officeRegistry()?.members||[];
+    if(round===1){
+      const registered=new Set(known.map(c=>normalizeElectoralName(c.name)));
+      if(state.opponents.some(o=>!registered.has(normalizeElectoralName(o.name)))){
+        state.opponents=historicOpponents(state.office,state.stateUF,state.municipality,state.candidate)
+          .map((r,i)=>({...r,funds:11+i*2,activity:"Preparando a campanha"}));
+        addNews("Cadastro histórico atualizado", "Os adversários da apuração foram identificados pela base eleitoral histórica correspondente ao cargo e localidade. Os votos seguem simulados.");
+      }
+    } else if(state.runoffRival && !known.some(c=>normalizeElectoralName(c.name)===normalizeElectoralName(state.runoffRival))){
+      const replacement=known.find(c=>normalizeElectoralName(c.name)!==normalizeElectoralName(state.candidate));
+      if(replacement)state.runoffRival=replacement.name;
+    }
+    tallySearchTerm="";tallyRowsVisible=30;
     const electorate=electionElectorate();
     const turnout=Math.round(electorate*rnd(.73,.84));
     const seats=state.office==="senador"&&round===1&&((state.electionYear-2026)%8===0)?2:1;
@@ -994,6 +1067,14 @@
     return `<div class="count-bulletin"><p class="eyebrow">CENTRAL DE NOTÍCIAS DO JOGO</p><h3>${line}</h3><p>${safeText(leader?.name||'Candidatura')} aparece com mais votos no boletim das ${a.snapshots[a.hourIndex].hour}, com diferença de ${difference} votos para a segunda colocação. Esta não é uma notícia real.</p></div>`;
   }
 
+  function searchTally(value){
+    tallySearchTerm=value;
+    tallyRowsVisible=30;
+    renderApuracao();
+    const input=$("tallySearch");
+    if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}
+  }
+  function moreTallyRows(){tallyRowsVisible+=50;renderApuracao();}
   function renderApuracao(){
     const el=$("apuracaoContent");if(!el)return;
     const archive=state.apuracaoHistory||[];
@@ -1009,7 +1090,8 @@
     const totalVotes=a.candidates.map((c,i)=>({...c,votes:counted[i],share:validCount?100*counted[i]/validCount:0})).sort((x,y)=>y.votes-x.votes);
     const isProp=["deputado_federal","deputado_estadual","vereador"].includes(a.office);
     const electionText=`${safeText(officeNames[a.office]||a.office)} · ${safeText(a.district)} · ${a.round}º turno · ${a.electionYear}`;
-    const list=totalVotes.map((c,i)=>`<div class="count-candidate ${c.name===state.candidate?'mine':''}"><div class="count-label"><span><strong>${safeText(c.name)}</strong><small>${safeText(c.party)}${c.name===state.candidate?' · Você':''}</small></span><span><strong>${fmtVotes(c.votes)} votos</strong><small>${c.share.toFixed(2).replace('.',',')}% válidos</small></span></div><div class="poll-track"><div class="poll-fill" style="width:${clamp(c.share,0,100)}%"></div></div></div>`).join("");
+    const filteredVotes=totalVotes.filter(c=>!tallySearchTerm || normalizeElectoralName(c.name+" "+c.party).includes(normalizeElectoralName(tallySearchTerm)));
+    const list=filteredVotes.slice(0,tallyRowsVisible).map((c,i)=>`<div class="count-candidate ${c.name===state.candidate?'mine':''}"><div class="count-label"><span><strong>${safeText(c.name)}</strong><small>${safeText(c.party)}${c.name===state.candidate?' · Você':''}</small></span><span><strong>${fmtVotes(c.votes)} votos</strong><small>${c.share.toFixed(2).replace('.',',')}% válidos</small></span></div><div class="poll-track"><div class="poll-fill" style="width:${clamp(c.share,0,100)}%"></div></div></div>`).join("");
     const currentTitle=active?`Apuração ao vivo · ${snapshot.hour}`:`Última apuração · ${snapshot.hour}`;
     const finished=a.hourIndex===7;
     const archiveNav=!active&&archive.length>1?`<div class="panel count-archives"><label><span>Apurações anteriores</span><select aria-label="Escolher eleição arquivada" onchange="window.__game.selectApuracaoArchive(this.value)">${archive.map((past,i)=>`<option value="${i}" ${i===idx?"selected":""}>${safeText(past.electionYear)} — ${safeText(officeNames[past.office]||past.office)} / ${safeText(past.district)} — ${past.round}º turno</option>`).join("")}</select></label></div>`:"";
@@ -1027,11 +1109,11 @@
         <div class="metric-card"><span>${finished?'Faltaram / abstenções':'Ainda não apurados ou ausentes'}</span><strong>${fmtVotes(finished?a.abstentions:a.registered-snapshot.voters)}</strong><small>${finished?(100*a.abstentions/a.registered).toFixed(2).replace('.',',')+'% dos eleitores aptos':'Inclui votos ainda não apurados'}</small></div>
       </div>
       ${apuracaoHeadlines(a)}
-      <div class="count-columns"><div class="panel"><div class="panel-head"><div><p class="eyebrow">PLACAR ELEITORAL</p><h3>Votação por candidato</h3></div><span class="badge">${totalVotes.length} candidaturas simuladas</span></div><div class="count-list">${list}</div></div>
+      <div class="count-columns"><div class="panel"><div class="panel-head"><div><p class="eyebrow">PLACAR ELEITORAL</p><h3>Votação por candidato</h3></div><span class="badge">${totalVotes.length} nomes no jogo</span></div><label style="margin:12px 0"><span>Buscar nome ou partido</span><input id="tallySearch" placeholder="Pesquisar no placar..." value="${safeText(tallySearchTerm)}" oninput="window.__game.searchTally(this.value)" /></label><p class="muted-text">Exibindo ${Math.min(filteredVotes.length,tallyRowsVisible)} de ${filteredVotes.length} candidatos encontrados.</p><div class="count-list">${list}</div>${filteredVotes.length>tallyRowsVisible?`<button type="button" class="btn btn-ghost full" onclick="window.__game.moreTallyRows()">Mostrar mais 50 candidatos</button>`:''}</div>
       <div class="panel count-aside"><p class="eyebrow">BOLETIM ELEITORAL</p><h3>${finished?'100% apurado':'Apuração em andamento'}</h3><p>Boletins simulados são liberados hora a hora. Percentuais de candidatos usam somente os votos válidos; brancos e nulos são exibidos separadamente.</p>
       <p><b>${fmtVotes(processed)}</b> voto(s) totalizados nesta simulação.${a.slots>1?` Cada eleitor pode registrar ${a.slots} votos para o Senado; os votos não equivalem ao número de pessoas.`:''}</p>
       <p>${finished?`Comparecimento final: ${fmtVotes(a.turnout)} eleitores. Não compareceram: ${fmtVotes(a.abstentions)}. Total de opções computadas: ${fmtVotes(a.turnout*a.slots)}.`:`Faltam etapas da contagem. Antes de 00h, o número de eleitores ainda não apurados inclui também quem não compareceu; a abstenção final só será conhecida ao término.`}</p>
-      ${isProp?`<p>A distribuição de cadeiras é simulada. ${a.proportional?.rosterVerified?`Os nomes e as legendas correspondem a registros históricos de ${a.proportional?.sourceYear||2024}; os votos não são reais, e não significam candidaturas em ${a.electionYear}.`:`Essa apuração foi criada sem nomes históricos. Se já houver cadastro desta localidade, use Recriar apuração com nomes históricos; caso contrário, importe um CSV oficial do TSE.`}</p><button type="button" class="btn btn-ghost full" onclick="window.__game.importRosterClick()">Importar candidatos reais (CSV TSE)</button>${active?`<button type="button" class="btn btn-ghost full" onclick="window.__game.restartApuracaoWithRealNames()">Recriar a apuração com nomes históricos</button>`:``}`:''}
+      ${isProp?`<p>A distribuição de cadeiras é simulada. ${a.proportional?.rosterVerified?`Os nomes e as legendas correspondem à lista histórica de ${a.proportional?.sourceYear||2024}; os votos não são reais, e não significam candidaturas em ${a.electionYear}.`:`Essa apuração foi criada sem nomes históricos. Se já houver cadastro desta localidade, use Recriar apuração com nomes históricos; caso contrário, importe um CSV oficial do TSE.`}</p><button type="button" class="btn btn-ghost full" onclick="window.__game.importRosterClick()">Importar candidatos reais (CSV TSE)</button>${active?`<button type="button" class="btn btn-ghost full" onclick="window.__game.restartApuracaoWithRealNames()">Recriar a apuração com nomes históricos</button>`:``}`:''}
       ${active?`<button class="btn btn-primary full" onclick="window.__game.advanceApuracao()">${finished?'Concluir apuração e divulgar resultado':`Avançar para ${APURACAO_HOURS[a.hourIndex+1]}`}</button>`:`<p class="count-closed">Apuração encerrada e arquivada no histórico da carreira.</p>`}
       </div></div>
       ${makeStateCountOverview(a)}
@@ -1307,7 +1389,8 @@
     const delta = nat - previousNational;
 
     $("candidateTitle").textContent = state.candidate;
-    $("candidateSubtitle").textContent = `${state.party} · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"} · Eleição ${state.electionYear} · ${ideologyLabel(state.ideology)}`;
+    const sourceRoster=officeRegistry();
+    $("candidateSubtitle").textContent = `${state.party} · ${officeNames[state.office]||"Presidente"} · ${state.district||"Brasil"} · Eleição simulada ${state.electionYear} · Nomes-base ${sourceRoster?.year||"não carregados"}`;
     $("nationalPoll").textContent = `${round1(nat)}%`;
     $("fundsMetric").textContent = money(state.funds);
     $("reputationMetric").textContent = Math.round(state.reputation);
@@ -1665,13 +1748,15 @@
     writeSave(false);
   }
 
-  function startNextCampaign() {
+  async function startNextCampaign() {
     if (!state || !["government","ended"].includes(state.phase)) return showToast("Primeiro conclua a eleição atual");
     const draft=state.careerDraft;
     if (!draft || !officeNames[draft.office] || !baseRegions.some(r=>r.uf===draft.uf)) return showToast("Selecione cargo e estado válidos");
     const city=(draft.municipality||citiesByState[draft.uf]||"").trim();
+    if ((draft.office==="prefeito"||draft.office==="vereador") && draft.uf==="DF") return showToast("O Distrito Federal não realiza eleições municipais");
     if ((draft.office==="prefeito"||draft.office==="vereador") && !city) return showToast("Informe o município");
     if ((draft.office==="prefeito"||draft.office==="vereador") && (!Number.isInteger(Number(draft.electorate))||Number(draft.electorate)<1000)) return showToast("Informe um eleitorado municipal simulado válido");
+    if(!await requireNationalRoster(draft.office,draft.uf,city))return;
     if (state.phase==="government") {
       const executiveSwitch=executiveOffices.has(state.office) && draft.office!==state.office;
       const note=executiveSwitch?" A mudança para outro cargo pressupõe, na realidade, renúncia no prazo legal; o jogo registra uma renúncia simulada, sem calcular datas de desincompatibilização.":"";
@@ -2396,6 +2481,6 @@
     advanceApuracao, selectApuracaoArchive,
     appointAdvisor,legislativeAction,
     loadProfile,deleteProfile,exportSave,
-    cloudAction,importRosterClick,restartApuracaoWithRealNames
+    cloudAction,importRosterClick,restartApuracaoWithRealNames,searchTally,moreTallyRows
   };
 })();

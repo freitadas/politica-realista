@@ -2,7 +2,7 @@ services:
   - type: web
     name: mandato-politico-game
     runtime: static
-    buildCommand: echo "Static site ready"
+    buildCommand: python3 scripts/build_rosters.py --skip-if-present
     staticPublishPath: .
     previews:
       generation: automatic
