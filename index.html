@@ -5,105 +5,145 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101624" />
   <meta name="description" content="Simulador de eleições brasileiras em cenário fictício com carreira, debates e gestão pública." />
-  <title>Mandato v9 — Simulador Político Integral</title>
+  <title>Mandato v12 — Simulador Político</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div id="app">
-    <section id="setup" class="setup-screen">
-      <div class="setup-card">
-        <div class="brand-lockup">
-          <div class="brand-mark">M</div>
-          <div>
-            <p class="eyebrow">SIMULADOR POLÍTICO</p>
-            <h1>Mandato <span class="v9-tag">v9</span></h1>
+    <section id="setup" class="setup-screen setup-redesign">
+      <div class="setup-card setup-hub">
+        <header class="setup-topline">
+          <div class="brand-lockup">
+            <div class="brand-mark">M</div>
+            <div>
+              <p class="eyebrow">SIMULADOR POLÍTICO</p>
+              <h1>Mandato <span class="v9-tag">v12</span></h1>
+            </div>
+          </div>
+          <span class="setup-edition">BRASIL ALTERNATIVO</span>
+        </header>
+
+        <div id="landingHome" class="landing-content">
+          <div class="landing-main">
+            <div class="landing-copy">
+              <p class="eyebrow">SUA CARREIRA. SUAS DECISÕES.</p>
+              <h2>Da primeira campanha ao próximo mandato.</h2>
+              <p>Escolha um cargo, dispute eleições e construa sua história política. Cada decisão muda o rumo da carreira.</p>
+            </div>
+            <div class="landing-choices">
+              <button id="newCareerSetup" class="landing-action landing-action-primary" type="button">
+                <span class="landing-action-icon" aria-hidden="true">+</span>
+                <span class="landing-action-text"><strong>Nova carreira</strong><small>Personalize seu candidato e comece a jogar</small></span>
+                <span class="landing-arrow" aria-hidden="true">→</span>
+              </button>
+              <button id="loadGameSetup" class="landing-action landing-action-secondary" type="button">
+                <span class="landing-action-icon" aria-hidden="true">↺</span>
+                <span class="landing-action-text"><strong>Continuar campanha</strong><small id="setupResumeHint">Retome seu último progresso</small></span>
+                <span class="landing-arrow" aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+          <div class="landing-footer">
+            <button id="manageSavesSetup" class="setup-link" type="button">Minhas carreiras <span id="setupProfileCount" class="setup-counter">0</span></button>
+            <span class="setup-footer-separator" aria-hidden="true"></span>
+            <details id="setupTools" class="setup-tools">
+              <summary>Importações e opções <span aria-hidden="true">⌄</span></summary>
+              <div class="setup-tools-body">
+                <button id="importGameSetup" class="btn btn-ghost" type="button">Importar backup (.json)</button>
+                <button id="importTseSetup" class="btn btn-ghost" type="button">Importar candidatos (CSV TSE)</button>
+                <p>Vitória e Vila Velha (ES) possuem cadastros históricos de 2024. Para outras localidades, é possível importar dados de candidaturas.</p>
+              </div>
+            </details>
+          </div>
+          <p class="landing-disclaimer">Simulação de história alternativa: votos, resultados e eventos são fictícios. Nomes de figuras públicas podem ser históricos e não indicam candidaturas atuais.</p>
+        </div>
+
+        <div id="setupCreatePanel" class="setup-flow hidden">
+          <div class="setup-flow-heading">
+            <div><p class="eyebrow">CRIAR CARREIRA</p><h2>Nova candidatura</h2></div>
+            <button id="setupCloseFlow" type="button" class="setup-close" aria-label="Fechar criação de carreira">✕</button>
+          </div>
+          <div class="setup-steps" aria-label="Etapas de criação">
+            <div id="setupStepIndicator1" class="setup-step-indicator current"><span>1</span> Perfil</div>
+            <div class="setup-step-line"></div>
+            <div id="setupStepIndicator2" class="setup-step-indicator"><span>2</span> Eleição</div>
+          </div>
+
+          <div id="setupStepProfile" class="setup-flow-body">
+            <h3>Quem é seu candidato?</h3>
+            <p class="setup-field-desc">Defina a identidade da candidatura. Você pode mudar de partido ao disputar outra eleição.</p>
+            <div class="setup-grid setup-flow-grid">
+              <label><span>Nome do candidato</span><input id="candidateName" type="text" value="Alex Moreira" maxlength="28" autocomplete="off" /></label>
+              <label><span>Partido brasileiro</span><select id="partyName">
+                <option value="PT">PT — Partido dos Trabalhadores</option>
+                <option value="PL">PL — Partido Liberal</option>
+                <option value="PSD">PSD — Partido Social Democrático</option>
+                <option value="MDB">MDB — Movimento Democrático Brasileiro</option>
+                <option value="PSB">PSB — Partido Socialista Brasileiro</option>
+                <option value="PSDB">PSDB — Partido da Social Democracia Brasileira</option>
+                <option value="PDT">PDT — Partido Democrático Trabalhista</option>
+                <option value="REPUBLICANOS">Republicanos</option>
+                <option value="UNIÃO">União Brasil</option>
+                <option value="PP">Progressistas (PP)</option>
+                <option value="PSOL">PSOL — Partido Socialismo e Liberdade</option>
+                <option value="NOVO">Novo</option>
+                <option value="PODE">Podemos</option>
+                <option value="MISSÃO">Missão</option>
+                <option value="REDE">Rede Sustentabilidade</option>
+                <option value="PV">Partido Verde</option>
+                <option value="FICTICIO">Criar partido fictício</option>
+              </select></label>
+              <label id="customPartyLabel" class="hidden"><span>Nome do partido fictício</span><input id="customPartyName" maxlength="32" placeholder="Ex.: Renovação Cidadã" value="Renovação Cidadã" /></label>
+              <label><span>Linha política</span><select id="ideology">
+                <option value="centro">Centro pragmático</option>
+                <option value="social">Social-desenvolvimentista</option>
+                <option value="liberal">Liberal reformista</option>
+                <option value="verde">Verde progressista</option>
+                <option value="conservador">Conservador institucional</option>
+              </select></label>
+            </div>
+            <div class="setup-flow-actions"><button id="setupBackHome" type="button" class="btn btn-ghost">Cancelar</button><button id="setupNextStep" type="button" class="btn btn-primary">Continuar <span aria-hidden="true">→</span></button></div>
+          </div>
+
+          <div id="setupStepElection" class="setup-flow-body hidden">
+            <h3>Qual eleição você vai disputar?</h3>
+            <p class="setup-field-desc">Escolha o cargo e, quando aplicável, o estado e município.</p>
+            <div class="setup-grid setup-flow-grid">
+              <label><span>Cargo pretendido</span><select id="officeChoice">
+                <option value="presidente">Presidente da República</option>
+                <option value="governador">Governador</option>
+                <option value="senador">Senador</option>
+                <option value="deputado_federal">Deputado federal</option>
+                <option value="deputado_estadual">Deputado estadual / distrital</option>
+                <option value="prefeito">Prefeito</option>
+                <option value="vereador">Vereador</option>
+              </select></label>
+              <label id="stateSelectLabel"><span>Estado de candidatura</span><select id="stateChoice"></select></label>
+              <label id="citySelectLabel" class="hidden"><span>Município da eleição</span><input id="cityChoice" maxlength="60" placeholder="Ex.: Vitória" value="Vitória" /></label>
+              <label id="electorateSelectLabel" class="hidden"><span>Eleitorado simulado do município</span><input id="electorateChoice" type="number" min="1000" max="15000000" step="1" value="300000" /></label>
+              <label><span>Dificuldade</span><select id="difficulty">
+                <option value="normal">Normal</option>
+                <option value="hard">Difícil</option>
+                <option value="expert">Especialista</option>
+              </select></label>
+            </div>
+            <div class="setup-flow-actions"><button id="setupPreviousStep" type="button" class="btn btn-ghost">← Voltar</button><button id="startGame" type="button" class="btn btn-primary">Começar campanha →</button></div>
           </div>
         </div>
 
-        <p class="setup-intro">
-          Construa uma carreira política no Brasil alternativo: escolha cargo, estado e município. Dispute eleições e administre seu mandato em uma simulação fictícia.
-        </p>
-
-        <div class="setup-grid" style="margin-bottom:16px">
-          <label><span>Cargo pretendido</span><select id="officeChoice">
-            <option value="presidente">Presidente da República</option>
-            <option value="governador">Governador</option>
-            <option value="senador">Senador</option>
-            <option value="deputado_federal">Deputado federal</option>
-            <option value="deputado_estadual">Deputado estadual / distrital</option>
-            <option value="prefeito">Prefeito</option>
-            <option value="vereador">Vereador</option>
-          </select></label>
-          <label id="stateSelectLabel"><span>Estado de candidatura</span><select id="stateChoice"></select></label>
-          <label id="citySelectLabel" class="hidden"><span>Município da eleição</span><input id="cityChoice" maxlength="60" placeholder="Ex.: Vitória" value="Vitória" /></label>
-          <label id="electorateSelectLabel" class="hidden"><span>Eleitorado simulado do município</span><input id="electorateChoice" type="number" min="1000" max="15000000" step="1" value="300000" /></label>
-        </div>
-        <div class="setup-grid">
-          <label id="customPartyLabel" class="hidden"><span>Nome do partido fictício</span><input id="customPartyName" maxlength="32" placeholder="Ex.: Renovação Cidadã" value="Renovação Cidadã" /></label>
-          <label>
-            <span>Nome do candidato</span>
-            <input id="candidateName" type="text" value="Alex Moreira" maxlength="28" />
-          </label>
-
-          <label>
-            <span>Linha política</span>
-            <select id="ideology">
-              <option value="centro">Centro pragmático</option>
-              <option value="social">Social-desenvolvimentista</option>
-              <option value="liberal">Liberal reformista</option>
-              <option value="verde">Verde progressista</option>
-              <option value="conservador">Conservador institucional</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Dificuldade</span>
-            <select id="difficulty">
-              <option value="normal">Normal</option>
-              <option value="hard">Difícil</option>
-              <option value="expert">Especialista</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Partido brasileiro</span>
-            <select id="partyName">
-              <option value="PT">PT — Partido dos Trabalhadores</option>
-              <option value="PL">PL — Partido Liberal</option>
-              <option value="PSD">PSD — Partido Social Democrático</option>
-              <option value="MDB">MDB — Movimento Democrático Brasileiro</option>
-              <option value="PSB">PSB — Partido Socialista Brasileiro</option>
-              <option value="PSDB">PSDB — Partido da Social Democracia Brasileira</option>
-              <option value="PDT">PDT — Partido Democrático Trabalhista</option>
-              <option value="REPUBLICANOS">Republicanos</option>
-              <option value="UNIÃO">União Brasil</option>
-              <option value="PP">Progressistas (PP)</option>
-              <option value="PSOL">PSOL — Partido Socialismo e Liberdade</option>
-              <option value="NOVO">Novo</option>
-              <option value="PODE">Podemos</option>
-              <option value="MISSÃO">Missão</option>
-              <option value="REDE">Rede Sustentabilidade</option>
-              <option value="PV">Partido Verde</option>
-              <option value="FICTICIO">Criar partido fictício</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="setup-actions">
-          <button id="startGame" class="btn btn-primary">Começar campanha</button>
-          <button id="loadGameSetup" class="btn btn-ghost">Continuar campanha</button>
-          <button id="manageSavesSetup" class="btn btn-ghost">Outras carreiras</button>
-          <button id="importGameSetup" class="btn btn-ghost">Importar backup</button>
+        <div id="setupProfilesPanel" class="setup-flow hidden">
+          <div class="setup-flow-heading">
+            <div><p class="eyebrow">PROGRESSO SALVO</p><h2>Minhas carreiras</h2></div>
+            <button id="setupCloseProfiles" type="button" class="setup-close" aria-label="Voltar à página inicial">✕</button>
+          </div>
+          <p class="setup-field-desc">Escolha uma carreira salva neste navegador para continuar.</p>
+          <div id="setupSlotList" class="setup-slot-list"></div>
+          <p id="setupEmptySlots" class="setup-empty hidden">Você ainda não tem carreiras salvas neste dispositivo.</p>
+          <div class="setup-flow-actions"><button id="setupProfilesBack" type="button" class="btn btn-ghost">← Voltar ao início</button></div>
         </div>
 
         <input type="file" id="backupFile" accept=".json,application/json" class="hidden" aria-label="Arquivo de backup do jogo" />
         <input type="file" id="tseCandidateFile" accept=".csv,text/csv" class="hidden" aria-label="Arquivo CSV de candidaturas do TSE" />
-        <button type="button" id="importTseSetup" class="btn btn-ghost">Importar candidatos reais (CSV TSE)</button>
-        <p class="setup-note">Vitória e Vila Velha (ES) já têm nomes históricos de 2024 incluídos. Para outras localidades ou cargos, importe o CSV oficial do TSE da UF correspondente. Os votos do jogo são fictícios.</p>
-        <div id="setupSlotList" class="setup-slot-list"></div>
-        <div class="setup-note">
-          Cenário de história alternativa. Partidos e algumas personalidades são reais, mas pesquisas, ações dos oponentes, resultados, processos e eventos são inventados. Regras de campanha, elegibilidade e distribuição de cadeiras são aproximações didáticas.
-        </div>
       </div>
     </section>
 

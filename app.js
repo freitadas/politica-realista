@@ -1980,7 +1980,7 @@
     try{
       localStorage.removeItem(`mandato_profile_${id}`);
       localStorage.setItem(PROFILE_INDEX,JSON.stringify(localProfileList().filter(x=>x.id!==id)));
-      if(state?.profileId===id){state=null;localStorage.removeItem(SAVE_KEY);$("game").classList.add("hidden");$("setup").classList.remove("hidden");}
+      if(state?.profileId===id){state=null;localStorage.removeItem(SAVE_KEY);setupLandingView("home");$("game").classList.add("hidden");$("setup").classList.remove("hidden");}
       renderSaveSlots();renderSetupSlots();
     }catch{showToast("Não foi possível excluir a carreira");}
   }
@@ -1989,6 +1989,7 @@
     const items=localProfileList();
     el.innerHTML=items.length?`<div class="slot-setup"><p class="eyebrow">CARREIRAS NESTE DISPOSITIVO</p>${items.map(x=>`<button class="btn btn-ghost" data-load-profile="${safeText(x.id)}">${safeText(x.candidate)} · ${safeText(officeNames[x.office]||x.office)} · ${safeText(x.district)}</button>`).join("")}</div>`:"";
     el.querySelectorAll("[data-load-profile]").forEach(b=>b.onclick=()=>loadProfile(b.dataset.loadProfile));
+    if($("setupProfileCount"))refreshSetupSummary();
   }
   function renderSaveSlots(){
     const el=$("savesContent");if(!el)return;
@@ -2163,6 +2164,8 @@
       try{localStorage.removeItem(SAVE_KEY);}catch{}
       // Os demais espaços de salvamento ficam preservados.
       renderSetupSlots();
+      refreshSetupSummary();
+      setupLandingView("home");
       $("game").classList.add("hidden");
       $("setup").classList.remove("hidden");
     }
@@ -2232,6 +2235,32 @@
     });
   }
 
+  function setupLandingView(view="home") {
+    const views={home:"landingHome",create:"setupCreatePanel",profiles:"setupProfilesPanel"};
+    Object.values(views).forEach(id=>$(id).classList.toggle("hidden",views[view]!==id));
+    refreshSetupSummary();
+    if(view==="create") setupStep(1);
+    if(view==="profiles") { renderSetupSlots(); }
+  }
+  function setupStep(step) {
+    $("setupStepProfile").classList.toggle("hidden",step!==1);
+    $("setupStepElection").classList.toggle("hidden",step!==2);
+    $("setupStepIndicator1").classList.toggle("current",step===1);
+    $("setupStepIndicator2").classList.toggle("current",step===2);
+    if(step===2)updateOfficeForm();
+  }
+  function refreshSetupSummary() {
+    const count=localProfileList().length;
+    $("setupProfileCount").textContent=String(count);
+    $("setupEmptySlots").classList.toggle("hidden",count!==0);
+    try {
+      const save=localStorage.getItem(SAVE_KEY);
+      $("setupResumeHint").textContent=save?"Seu progresso está pronto para continuar":count?"Escolha uma das carreiras salvas":"Nenhuma campanha recente neste dispositivo";
+    } catch {
+      $("setupResumeHint").textContent="Carregamento pode exigir um backup";
+    }
+  }
+
   function updateOfficeForm(){
     const office=selectedOffice();
     $("stateSelectLabel").classList.toggle("hidden",office==="presidente");
@@ -2245,10 +2274,26 @@
   $("stateChoice").onchange=()=>{$("cityChoice").value=citiesByState[$("stateChoice").value]||"";$("electorateChoice").value="300000";};
   updateOfficeForm();
   renderSetupSlots();
-  $("manageSavesSetup").onclick=()=>{const profiles=localProfileList();if(!profiles.length)return showToast("Nenhuma carreira salva ainda");renderSetupSlots();showToast("Selecione uma carreira abaixo");};
+  refreshSetupSummary();
+  $("newCareerSetup").onclick=()=>setupLandingView("create");
+  $("setupCloseFlow").onclick=()=>setupLandingView("home");
+  $("setupBackHome").onclick=()=>setupLandingView("home");
+  $("setupNextStep").onclick=()=>{
+    if(!$("candidateName").value.trim())return showToast("Informe o nome do candidato");
+    if($("partyName").value==="FICTICIO"&&!$("customPartyName").value.trim())return showToast("Informe o nome do partido fictício");
+    setupStep(2);
+  };
+  $("setupPreviousStep").onclick=()=>setupStep(1);
+  $("manageSavesSetup").onclick=()=>setupLandingView("profiles");
+  $("setupCloseProfiles").onclick=()=>setupLandingView("home");
+  $("setupProfilesBack").onclick=()=>setupLandingView("home");
   $("showSavesTop").onclick=()=>navTo("saves");
   $("startGame").onclick = startGame;
-  $("loadGameSetup").onclick = loadGame;
+  $("loadGameSetup").onclick = () => {
+    try { if(!localStorage.getItem(SAVE_KEY) && localProfileList().length) return setupLandingView("profiles"); }
+    catch { /* loadGame informa erro de armazenamento */ }
+    loadGame();
+  };
   $("saveGame").onclick = saveGame;
   $("saveGameTop").onclick = saveGame;
   $("exportGame").onclick = exportSave;

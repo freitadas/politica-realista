@@ -582,3 +582,83 @@ nav { display: grid; gap: 10px; margin-top: 24px; overflow-y: auto; padding-righ
   .nav-group-toggle { font-size: 13px; }
   .nav-item { font-size: 13px; padding: 10px 11px; }
 }
+
+/* v12 · página inicial com ações prioritárias e formulário em duas etapas */
+.setup-redesign {padding:30px 18px;align-items:center;}
+.setup-redesign .setup-hub {width:min(900px,100%);min-height:450px;padding:0;overflow:hidden;border-radius:24px;background:#161e30;box-shadow:0 26px 90px rgba(0,0,0,.22);}
+.setup-topline {display:flex;justify-content:space-between;align-items:center;gap:16px;padding:25px 32px;border-bottom:1px solid var(--line);}
+.setup-topline .brand-mark {width:40px;height:40px;}
+.setup-topline .brand-lockup h1 {font-size:26px;line-height:1.2;}
+.setup-edition {font-size:10px;letter-spacing:.12em;color:#aab6cc;border:1px solid #35415b;border-radius:50px;padding:7px 12px;white-space:nowrap;}
+.landing-content {padding:43px 45px 24px;}
+.landing-main {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(290px,.9fr);gap:44px;align-items:center;min-height:236px;}
+.landing-copy h2 {font-size:clamp(28px,3.4vw,39px);letter-spacing:-.045em;line-height:1.14;max-width:440px;margin:12px 0 16px;}
+.landing-copy > p:last-child {color:#a8b5c8;font-size:14px;line-height:1.65;max-width:425px;}
+.landing-choices {display:grid;gap:12px;}
+.landing-action {width:100%;min-height:86px;display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #36425b;border-radius:15px;background:#1a2439;color:var(--text);text-align:left;transition:background .18s,border-color .18s,transform .18s;}
+.landing-action:hover {border-color:#68d9ad;transform:translateY(-2px);background:#233049;}
+.landing-action:focus-visible,.setup-link:focus-visible,.setup-close:focus-visible,.setup-tools summary:focus-visible {outline:2px solid var(--accent);outline-offset:3px;}
+.landing-action-primary {background:var(--accent);border-color:var(--accent);color:#071b13;}
+.landing-action-primary:hover {background:#74e2b7;color:#071b13;}
+.landing-action-icon {flex:0 0 38px;width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:rgba(8,30,21,.12);font-size:22px;font-weight:600;}
+.landing-action-secondary .landing-action-icon {color:var(--accent);background:rgba(82,214,164,.12);}
+.landing-action-text {display:grid;gap:4px;flex:1;min-width:0;}
+.landing-action-text strong {font-size:16px;}
+.landing-action-text small {font-size:11px;line-height:1.4;opacity:.8;}
+.landing-arrow {font-size:19px;opacity:.85;}
+.landing-footer {display:flex;gap:16px;align-items:center;border-top:1px solid var(--line);margin-top:26px;padding-top:18px;flex-wrap:wrap;}
+.setup-link {display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;color:#dce5f2;font-size:13px;font-weight:750;padding:6px 2px;}
+.setup-link:hover {color:var(--accent);}
+.setup-counter {display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;background:#253047;border-radius:99px;font-size:11px;}
+.setup-footer-separator {height:20px;width:1px;background:var(--line);}
+.setup-tools {position:relative;}
+.setup-tools summary {font-size:13px;font-weight:750;color:#aebbd0;cursor:pointer;list-style:none;padding:6px 0;}
+.setup-tools summary::-webkit-details-marker {display:none;}
+.setup-tools summary span {font-size:16px;margin-left:6px;}
+.setup-tools[open] summary {color:var(--accent);}
+.setup-tools-body {margin-top:12px;padding:15px;display:flex;flex-wrap:wrap;gap:9px;background:#101827;border:1px solid var(--line);border-radius:12px;max-width:590px;}
+.setup-tools-body .btn {font-size:12px;padding:10px 12px;}
+.setup-tools-body p {font-size:11px;color:var(--muted);line-height:1.6;margin:3px 0 0;}
+.landing-disclaimer {font-size:10px;line-height:1.6;color:#7d89a0;margin:22px 0 0;}
+.setup-flow {padding:27px 36px 34px;}
+.setup-flow-heading {display:flex;justify-content:space-between;gap:20px;align-items:flex-start;}
+.setup-flow-heading h2 {margin:4px 0 0;font-size:24px;letter-spacing:-.03em;}
+.setup-close {border:1px solid var(--line);border-radius:10px;color:#ced9e8;background:#111827;width:35px;height:35px;font-size:16px;}
+.setup-close:hover {background:#25344f;}
+.setup-steps {display:flex;gap:13px;align-items:center;margin:22px 0;padding:15px;background:#111827;border:1px solid var(--line);border-radius:12px;}
+.setup-step-indicator {display:flex;gap:8px;align-items:center;font-size:12px;font-weight:750;color:#8594ab;white-space:nowrap;}
+.setup-step-indicator > span {width:25px;height:25px;border-radius:100%;display:grid;place-items:center;border:1px solid #44516c;font-size:12px;}
+.setup-step-indicator.current {color:#e9f3ef;}
+.setup-step-indicator.current > span {background:var(--accent);color:#092016;border-color:var(--accent);}
+.setup-step-line {flex:1;height:1px;background:#35415b;}
+.setup-flow-body h3 {margin:0 0 5px;font-size:19px;}
+.setup-field-desc {margin:0 0 22px;color:var(--muted);font-size:13px;line-height:1.55;}
+.setup-flow-grid {gap:15px;}
+.setup-flow-actions {display:flex;justify-content:space-between;gap:12px;margin-top:30px;}
+.setup-flow-actions .btn {padding:13px 18px;}
+#setupProfilesPanel .slot-setup {background:transparent;border:0;padding:0;margin:0;display:grid;gap:10px;}
+#setupProfilesPanel .slot-setup .eyebrow {display:none;}
+#setupProfilesPanel .slot-setup .btn {text-align:left;white-space:normal;}
+#setupProfilesPanel .setup-flow-actions {margin-top:18px;}
+.setup-empty {padding:20px;color:var(--muted);background:#101827;border-radius:12px;font-size:13px;line-height:1.5;}
+@media(max-width:750px) {
+ .setup-redesign {padding:12px;}
+ .setup-redesign .setup-hub {min-height:0;}
+ .setup-topline {padding:20px;}
+ .setup-edition {display:none;}
+ .landing-content {padding:28px 22px 22px;}
+ .landing-main {grid-template-columns:minmax(0,1fr);gap:19px;}
+ .landing-copy h2 {font-size:30px;max-width:440px;}
+ .landing-copy > p:last-child {font-size:13px;}
+ .landing-action {min-height:75px;}
+ .setup-flow {padding:24px 22px 26px;}
+ .setup-flow-grid {grid-template-columns:1fr;}
+}
+@media(max-width:430px) {
+ .setup-topline .brand-lockup h1 {font-size:24px;}
+ .landing-copy h2 {font-size:27px;}
+ .landing-footer {gap:10px;}
+ .setup-footer-separator {display:none;}
+ .setup-tools {width:100%;}
+ .setup-flow-actions .btn {flex:1;min-width:0;font-size:13px;padding:12px 9px;}
+}
