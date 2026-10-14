@@ -872,3 +872,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 
 /* Mobile navigation is only displayed while the game is open. */
 #game.hidden ~ #mobileBottomNav, #game.hidden ~ #sidebarBackdrop { display:none !important; }
+
+/* v15 · acompanhamento de resultados e foco contextual */
+.project-pipeline{display:grid;gap:8px;margin:16px 0}.project-entry{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#111a2c}.project-entry strong{display:block;font-size:13px}.project-entry small{display:block;color:var(--muted);font-size:11px;line-height:1.5;margin-top:4px}.project-status{min-width:135px;text-align:right}.project-totals{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px}.project-totals strong{color:var(--text)}@media(max-width:600px){.project-entry{flex-direction:column;align-items:stretch}.project-status{text-align:left;min-width:0}}

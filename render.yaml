@@ -2,7 +2,7 @@ services:
   - type: web
     name: mandato-politico-game
     runtime: static
-    buildCommand: python3 scripts/build_rosters.py --skip-if-present
+    buildCommand: python3 scripts/build_rosters.py --skip-if-present || echo "AVISO: fonte TSE indisponivel; modo ficticio e importacao CSV permanecem disponiveis"
     staticPublishPath: .
     previews:
       generation: automatic
