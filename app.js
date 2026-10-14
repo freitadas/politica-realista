@@ -350,7 +350,7 @@
     const partyProfile = newPartyProfile(customParty);
 
     return {
-      version: 9,
+      version: 10,
       profileId: createProfileId(),
       voterGroups: createVoterGroups(),
       partyLeadership: 25,
@@ -400,7 +400,7 @@
       illicitFunds: 0,
       ai: modifiers.ai,
       regions: electionDistricts(selectedOffice(), $("stateChoice").value, $("cityChoice").value.trim()).map(r => ({...r, support: r.support + modifiers.support})),
-      opponents: (selectedOffice()==="presidente"? opponents: fictionalRivals).map((o,i) => ({...o, funds: 11 + i*2, activity:"Preparando a campanha"})),
+      opponents: historicOpponents(selectedOffice(),$("stateChoice").value,$("cityChoice").value.trim(),$("candidateName").value.trim()).map((o,i) => ({...o, funds: 11 + i*2, activity:"Preparando a campanha"})),
       proposals: {},
       coalitions: coalitionDefs.map(c => ({...c, secured: false})),
       news: [
@@ -585,9 +585,50 @@
     state.rivalActivity = state.rivalActivity.slice(0,9);
   }
 
-  // Approximate proportional distribution: QE/QP, 10% QE individual minimum,
-  // 80% QE party and 20% QE candidate for early largest-average leftovers.
-  // Artificial totals and lists are for play; not an official TSE calculation.
+  // Cadastro real histórico: datas, nomes de urna e siglas são referentes à eleição de origem.
+  // O jogo NÃO afirma que essas pessoas sejam candidatas em anos futuros; votos são simulados.
+  const TSE_CSV_HELP = "https://dadosabertos.tse.jus.br/dataset/candidatos-2024";
+  const rosterKey=(office,uf,city)=>`${String(uf||"ES").toUpperCase()}|${normalizeElectoralName(city||"")}|${office}`;
+  function normalizeElectoralName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim().replace(/\s+/g," ");}
+  function historicalRegistry(office,uf,city){
+    const id=rosterKey(office,uf,city);
+    // Imported TSE CSV overrides the bundled historical snapshots for the same district.
+    try{
+      const stored=localStorage.getItem(`mandato_tse_roster_${id}`);
+      if(stored){const data=JSON.parse(stored);if(data?.members?.length)return data;}
+    }catch(err){console.warn("Cadastro eleitoral local indisponível",err);}
+    return window.MANDATO_CANDIDATOS_HISTORICOS?.[id]||null;
+  }
+  function officeRegistry(){
+    if(!state)return null;
+    return historicalRegistry(state.office,state.stateUF,state.municipality);
+  }
+  function historicOpponents(office,uf,city,player){
+    if(office==="presidente")return opponents.map(o=>({...o}));
+    const roster=historicalRegistry(office,uf,city);
+    if(roster && roster.members.length){
+      return roster.members.filter(r=>normalizeElectoralName(r.name)!==normalizeElectoralName(player))
+        .slice(0,office==="prefeito"?6:8).map((r,i)=>({id:`hist${i}`,name:r.name,party:r.party,poll:[30.5,26.2,12.4,8,6,5,4,3][i]}));
+    }
+    // A campanha pode funcionar sem cadastro, mas não inventa vínculo de pessoa real a uma legenda.
+    return fictionalRivals.map((o,i)=>({id:`anon${i}`,name:`Oponente simulado ${i+1}`,party:o.party,poll:o.poll}));
+  }
+  function rosterDescription(registry){
+    return registry?`Nomes históricos ${registry.year}, de ${registry.sourceLabel||'registro eleitoral'}; votação inteiramente simulada.`:
+      `Sem cadastro histórico deste cargo e localidade. Importe um CSV oficial em ${TSE_CSV_HELP} para usar nomes reais.`;
+  }
+  function partyPool(registry,playerParty){
+    const grouped=new Map();
+    for(const m of (registry?.members||[])){
+      if(!m?.name||!m.party)continue;
+      const p=m.party.toUpperCase();
+      if(!grouped.has(p))grouped.set(p,[]);
+      if(!grouped.get(p).some(x=>normalizeElectoralName(x.name)===normalizeElectoralName(m.name)))grouped.get(p).push(m);
+    }
+    const partyIds=[playerParty,...[...grouped.entries()].filter(([p])=>p!==playerParty).sort((a,b)=>b[1].length-a[1].length).map(([p])=>p)].slice(0,registry?12:9);
+    if(!registry)return [playerParty,'PT','PL','PSD','MDB','PSB','UNIÃO','REPUBLICANOS','PDT','NOVO'].filter((x,i,a)=>a.indexOf(x)===i).slice(0,9).map(id=>({id,rows:[]}));
+    return partyIds.map(id=>({id,rows:grouped.get(id)||[]}));
+  }
   function calculateProportional(share, validVoteOverride = null) {
     const stateSize={SP:70,MG:53,RJ:46,BA:39,RS:31,PR:30,PE:25,CE:22,PA:17,SC:16,GO:17,MA:18,ES:10,DF:8};
     const isCity=state.office==="vereador";
@@ -596,25 +637,29 @@
       : clamp(Math.round((stateSize[state.stateUF]||8)*1.35)+12,24,94);
     const validVotes=validVoteOverride ?? Math.round(isCity ? Math.max(1000,state.municipalityElectorate||150000)*.72 : 1200000);
     const qe=Math.max(1,Math.round(validVotes/seats));
-    // The user's visible support is an individual preference proxy, NOT their party vote.
-    const partyIds=[state.party,'PT','PL','PSD','MDB','PSB','UNIÃO','REPUBLICANOS','PDT','NOVO']
-      .filter((x,i,a)=>a.indexOf(x)===i).slice(0,9);
+    const registry=officeRegistry();
+    const pools=partyPool(registry,state.party);
     const playerVoteShare=clamp(share,4,54);
-    const partyWeights=partyIds.map((p,i)=>i===0?clamp(10+playerVoteShare*.38,9,34):rnd(6,21));
-    const wsum=partyWeights.reduce((a,b)=>a+b,0);
+    const partyWeights=pools.map((p,i)=>i===0?clamp(10+playerVoteShare*.38,9,34):rnd(6,21));
     const partyCounts=allocateExact(validVotes,partyWeights);
-    const parties=partyIds.map((id,i)=>{
+    const parties=pools.map((pool,i)=>{
       const totalVotes=partyCounts[i];
-      const listSize=Math.max(12,Math.ceil(seats*.35));
-      const raw=Array.from({length:listSize},(_,j)=>rnd(.35,2.8)/Math.sqrt(j+1));
-      if(i===0) raw[0]=clamp(playerVoteShare/20, .45, 3.1);
-      const sw=raw.reduce((a,b)=>a+b,0);
-      const members=raw.map((x,j)=>({name:i===0&&j===0?state.candidate:`Candidato fictício ${j+1} (${id})`,votes:Math.floor(totalVotes*x/sw)}));
-      // Deterministically adjust rounding to conserve the simulated party vote total
+      const choices=pool.rows.filter(m=>normalizeElectoralName(m.name)!==normalizeElectoralName(state.candidate));
+      // Every named historical candidacy is unique and retains the documented party.
+      const candidates=registry?(i===0?[{name:state.candidate,party:state.party},...choices]:choices)
+        :Array.from({length:Math.max(12,Math.ceil(seats*.35))},(_,j)=>({name:i===0&&j===0?state.candidate:`Sem cadastro nominal · ${pool.id} · ${j+1}`,party:pool.id}));
+      if(!candidates.length)return null;
+      const raw=candidates.map((_,j)=>rnd(.35,2.8)/Math.sqrt(j+1));
+      if(i===0)raw[0]=clamp(playerVoteShare/20,.45,3.1);
+      const sum=raw.reduce((a,b)=>a+b,0);
+      const members=candidates.map((c,j)=>({name:c.name,party:c.party,votes:Math.floor(totalVotes*raw[j]/sum)}));
       members[0].votes+=totalVotes-members.reduce((a,c)=>a+c.votes,0);
       members.sort((a,b)=>b.votes-a.votes);
-      return {id,votes:totalVotes,members,seats:0,winners:[]};
-    });
+      return {id:pool.id,votes:totalVotes,members,seats:0,winners:[]};
+    }).filter(Boolean);
+    // All legitimate party totals must be represented, even if the imported file has sparse rows.
+    const assigned=parties.reduce((a,p)=>a+p.votes,0);
+    if(assigned<validVotes && parties.length){parties[0].votes+=validVotes-assigned;parties[0].members[0].votes+=validVotes-assigned;}
     let distributed=0;
     for(const p of parties){
       const earned=Math.floor(p.votes/qe);
@@ -624,22 +669,91 @@
       distributed+=p.seats;
     }
     while(distributed<seats){
-      // Progressive eligibility relaxation after the first remainder pass.
-      let eligible=parties.filter(p=>p.votes>=.8*qe && p.members.some(c=> !p.winners.includes(c) && c.votes>=.2*qe));
-      if(!eligible.length) eligible=parties.filter(p=>p.members.some(c=>!p.winners.includes(c) && c.votes>=.1*qe));
-      if(!eligible.length) break;
+      let eligible=parties.filter(p=>p.votes>=.8*qe && p.members.some(c=>!p.winners.includes(c)&&c.votes>=.2*qe));
+      if(!eligible.length)eligible=parties.filter(p=>p.members.some(c=>!p.winners.includes(c)&&c.votes>=.1*qe));
+      if(!eligible.length)break;
       eligible.sort((a,b)=>b.votes/(b.seats+1)-a.votes/(a.seats+1));
       const p=eligible[0];
-      const candidate=p.members.find(c=>!p.winners.includes(c) && c.votes>=(p.votes>=.8*qe?.2:.1)*qe);
+      const candidate=p.members.find(c=>!p.winners.includes(c)&&c.votes>=(p.votes>=.8*qe?.2:.1)*qe);
       if(!candidate)break;
       p.winners.push(candidate);p.seats++;distributed++;
     }
-    const own=parties[0];
-    const player=own.members.find(c=>c.name===state.candidate);
-    return {elected:own.winners.some(c=>c.name===state.candidate),seats,qe,votes:player?.votes||0,
-      partyVotes:own.votes,partySeats:own.seats,party:own.id,validVotes,
-      candidateResults:parties.flatMap(p=>p.members.map(c=>({name:c.name,party:p.id,votes:c.votes}))),
+    const own=parties.find(p=>p.id===state.party)||parties[0];
+    const player=own?.members.find(c=>c.name===state.candidate);
+    return {elected:!!own?.winners.some(c=>c.name===state.candidate),seats,qe,votes:player?.votes||0,
+      partyVotes:own?.votes||0,partySeats:own?.seats||0,party:own?.id||state.party,validVotes,
+      sourceYear:registry?.year||null,sourceURL:registry?.source||null,rosterVerified:!!registry,
+      candidateResults:parties.flatMap(p=>p.members.map(c=>({name:c.name,party:c.party,votes:c.votes}))),
       details:parties.map(p=>({party:p.id,seats:p.seats,votes:p.votes}))};
+  }
+
+  function parsedCSVLine(line){
+    const cells=[];let value="",quote=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"') {if(quote&&line[i+1]==='"'){value+='"';i++;}else quote=!quote;}
+      else if(ch===';'&&!quote){cells.push(value);value='';}
+      else value+=ch;
+    }
+    cells.push(value);return cells;
+  }
+  function importRosterClick(){const el=$('tseCandidateFile');if(el)el.click();}
+  async function importTseCandidateCSV(file){
+    if(!file)return;
+    if(!file.name.toLowerCase().endsWith('.csv'))return showToast('Extraia o ZIP do TSE e selecione o arquivo CSV da UF');
+    if(file.size>90_000_000)return showToast('Arquivo CSV muito grande; use o arquivo separado por UF');
+    try{
+      const buf=await file.arrayBuffer();let content;
+      try{content=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch{content=new TextDecoder('windows-1252').decode(buf);}
+      const lines=content.split(/\r?\n/);
+      const head=parsedCSVLine(lines[0].replace(/^\ufeff/,''));
+      const col=(s)=>head.indexOf(s);
+      const nameCol=col('NM_URNA_CANDIDATO'),partyCol=col('SG_PARTIDO'),cargoCol=col('DS_CARGO'),ufCol=col('SG_UF');
+      const cityCol=col('NM_UE')>=0?col('NM_UE'):col('NM_MUNICIPIO');
+      if([nameCol,partyCol,cargoCol,ufCol].some(x=>x<0))throw Error('CSV incompatível: faltam colunas NM_URNA_CANDIDATO, SG_PARTIDO, DS_CARGO ou SG_UF');
+      const chosenOffice=state?.office||selectedOffice();
+      const chosenUF=state?.stateUF||$('stateChoice').value;
+      const chosenCity=state?.municipality||$('cityChoice').value.trim();
+      const types={vereador:'VEREADOR',prefeito:'PREFEITO',deputado_federal:'DEPUTADO FEDERAL',deputado_estadual:chosenUF==='DF'?'DEPUTADO DISTRITAL':'DEPUTADO ESTADUAL',senador:'SENADOR',governador:'GOVERNADOR',presidente:'PRESIDENTE'};
+      const matchCity=['prefeito','vereador'].includes(chosenOffice);
+      const sought=normalizeElectoralName(chosenCity);
+      const filtered=[];const seen=new Set();
+      for(let i=1;i<lines.length;i++){
+        if(!lines[i]||!lines[i].includes(';'))continue;
+        const c=parsedCSVLine(lines[i]);
+        if(String(c[ufCol]||'').toUpperCase()!==chosenUF.toUpperCase() && chosenOffice!=='presidente')continue;
+        if(normalizeElectoralName(c[cargoCol])!==types[chosenOffice])continue;
+        if(matchCity && (!cityCol||cityCol<0||normalizeElectoralName(c[cityCol])!==sought))continue;
+        const name=String(c[nameCol]||'').trim();const party=String(c[partyCol]||'').trim().toUpperCase();
+        if(!name||!party||name==='#NULO#')continue;
+        const unique=normalizeElectoralName(name)+'|'+party;
+        if(seen.has(unique))continue;seen.add(unique);filtered.push({name,party});
+      }
+      if(!filtered.length)throw Error('Nenhum candidato encontrado para o cargo, a UF e o município selecionados');
+      const m=/consulta_cand_(20\d\d)/i.exec(file.name);
+      const year=m?Number(m[1]):(['prefeito','vereador'].includes(chosenOffice)?2024:2022);
+      const key=rosterKey(chosenOffice,chosenUF,chosenCity);
+      const registry={members:filtered,year,source:'https://dadosabertos.tse.jus.br/dataset/candidatos-'+year,sourceLabel:'arquivo CSV importado do TSE'};
+      try{localStorage.setItem('mandato_tse_roster_'+key,JSON.stringify(registry));}
+      catch{showToast('Não foi possível guardar a lista, mas ela será usada nesta sessão');}
+      window.MANDATO_CANDIDATOS_HISTORICOS??={};window.MANDATO_CANDIDATOS_HISTORICOS[key]=registry;
+      if(state && state.phase==='campaign'){
+        const rivals=historicOpponents(state.office,state.stateUF,state.municipality,state.candidate);
+        state.opponents=rivals.map((r,i)=>({...r,funds:11+i*2,activity:'Preparando a campanha'}));
+        renderAll();
+      }
+      showToast(`${filtered.length} nomes reais importados para ${chosenOffice}`);
+      if(state)navTo('apuracao');
+    }catch(e){showToast(e.message||'Erro ao importar CSV');}
+  }
+  function restartApuracaoWithRealNames(){
+    if(!state||state.phase!=='counting'||!state.apuracao)return;
+    const old=state.apuracao,reg=officeRegistry();
+    if(!reg?.members?.length)return showToast('Importe o cadastro eleitoral primeiro');
+    if(!confirm('Recriar a apuração com nomes históricos reais? A contagem volta às 17h e novos totais serão simulados. Seu histórico de carreira continuará salvo.'))return;
+    state.apuracao=null;
+    startApuracao(old.round);
+    showToast('Apuração recriada com nomes reais históricos');
   }
 
   function hasRunoff() {
@@ -913,11 +1027,11 @@
         <div class="metric-card"><span>${finished?'Faltaram / abstenções':'Ainda não apurados ou ausentes'}</span><strong>${fmtVotes(finished?a.abstentions:a.registered-snapshot.voters)}</strong><small>${finished?(100*a.abstentions/a.registered).toFixed(2).replace('.',',')+'% dos eleitores aptos':'Inclui votos ainda não apurados'}</small></div>
       </div>
       ${apuracaoHeadlines(a)}
-      <div class="count-columns"><div class="panel"><div class="panel-head"><div><p class="eyebrow">PLACAR ELEITORAL</p><h3>Votação por candidato</h3></div><span class="badge">${totalVotes.length} candidaturas</span></div><div class="count-list">${list}</div></div>
+      <div class="count-columns"><div class="panel"><div class="panel-head"><div><p class="eyebrow">PLACAR ELEITORAL</p><h3>Votação por candidato</h3></div><span class="badge">${totalVotes.length} candidaturas simuladas</span></div><div class="count-list">${list}</div></div>
       <div class="panel count-aside"><p class="eyebrow">BOLETIM ELEITORAL</p><h3>${finished?'100% apurado':'Apuração em andamento'}</h3><p>Boletins simulados são liberados hora a hora. Percentuais de candidatos usam somente os votos válidos; brancos e nulos são exibidos separadamente.</p>
       <p><b>${fmtVotes(processed)}</b> voto(s) totalizados nesta simulação.${a.slots>1?` Cada eleitor pode registrar ${a.slots} votos para o Senado; os votos não equivalem ao número de pessoas.`:''}</p>
       <p>${finished?`Comparecimento final: ${fmtVotes(a.turnout)} eleitores. Não compareceram: ${fmtVotes(a.abstentions)}. Total de opções computadas: ${fmtVotes(a.turnout*a.slots)}.`:`Faltam etapas da contagem. Antes de 00h, o número de eleitores ainda não apurados inclui também quem não compareceu; a abstenção final só será conhecida ao término.`}</p>
-      ${isProp?`<p>A distribuição de cadeiras usa uma fórmula proporcional fictícia. A lista mostra os candidatos simulados e seus votos nominais; não é uma apuração do TSE.</p>`:''}
+      ${isProp?`<p>A distribuição de cadeiras é simulada. ${a.proportional?.rosterVerified?`Os nomes e as legendas correspondem a registros históricos de ${a.proportional?.sourceYear||2024}; os votos não são reais, e não significam candidaturas em ${a.electionYear}.`:`Essa apuração foi criada sem nomes históricos. Se já houver cadastro desta localidade, use Recriar apuração com nomes históricos; caso contrário, importe um CSV oficial do TSE.`}</p><button type="button" class="btn btn-ghost full" onclick="window.__game.importRosterClick()">Importar candidatos reais (CSV TSE)</button>${active?`<button type="button" class="btn btn-ghost full" onclick="window.__game.restartApuracaoWithRealNames()">Recriar a apuração com nomes históricos</button>`:``}`:''}
       ${active?`<button class="btn btn-primary full" onclick="window.__game.advanceApuracao()">${finished?'Concluir apuração e divulgar resultado':`Avançar para ${APURACAO_HOURS[a.hourIndex+1]}`}</button>`:`<p class="count-closed">Apuração encerrada e arquivada no histórico da carreira.</p>`}
       </div></div>
       ${makeStateCountOverview(a)}
@@ -1594,7 +1708,7 @@
     state.media=0;state.digital=clamp(state.digital*.4,12,48);state.debate=clamp(state.debate*.6,20,70);
     state.regions=electionDistricts(draft.office,draft.uf,city).map(r=>({...r,
       support:clamp(r.support+(state.reputation-50)*.09,5,57)}));
-    state.opponents=(draft.office==="presidente"?opponents:fictionalRivals).map((o,i)=>({...o,funds:11+i*2,activity:"Preparando a campanha"}));
+    state.opponents=historicOpponents(draft.office,draft.uf,city,state.candidate).map((o,i)=>({...o,funds:11+i*2,activity:"Preparando a campanha"}));
     state.municipalityElectorate=Number(draft.electorate)||300000;
     state.rivalActivity=[];
     state.pendingEvent=null;
@@ -1964,7 +2078,7 @@
     state.office ??= "presidente";
     state.district ??= "Brasil";
       state.phase ??= state.finished ? "ended":"campaign";
-      state.version = 9;
+      state.version = 10;
       state.profileId ??= createProfileId();
       state.voterGroups ??= createVoterGroups();
       state.partyLeadership ??= 25;
@@ -2063,10 +2177,24 @@
     toastTimer = setTimeout(() => el.classList.add("hidden"), 2200);
   }
 
+  function openNavGroupByView(view) {
+    const btn = document.querySelector(`.nav-item[data-view="${view}"]`);
+    if (!btn) return;
+    const group = btn.closest(".nav-group");
+    if (!group) return;
+    document.querySelectorAll(".nav-group").forEach(g => {
+      const active = g === group;
+      g.classList.toggle("open", active);
+      const toggle = g.querySelector(".nav-group-toggle");
+      if (toggle) toggle.setAttribute("aria-expanded", active ? "true" : "false");
+    });
+  }
+
   function navTo(view) {
     document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     $(`${view}View`).classList.add("active");
+    openNavGroupByView(view);
     const labels = {
       overview: "Visão geral",
       regions: "Regiões",
@@ -2075,13 +2203,33 @@
       media: "Mídia",
       coalitions: "Alianças",
       integrity: "Integridade",
-      government: "Mandato",
-      career: "Carreira",
+      government: "Governo",
+      career: "Carreira política",
       debate: "Debate ao vivo",
-      apuracao: "Apuração",
+      apuracao: "Apuração eleitoral",
       electorate:"Eleitorado",cabinet:"Gabinete e Congresso",saves:"Salvamentos"
     };
     $("pageTitle").textContent = labels[view];
+  }
+
+  function setupNavGroups() {
+    document.querySelectorAll(".nav-group-toggle").forEach(toggle => {
+      toggle.onclick = () => {
+        const groupKey = toggle.dataset.groupToggle;
+        const group = document.querySelector(`.nav-group[data-group="${groupKey}"]`);
+        if (!group) return;
+        const willOpen = !group.classList.contains("open");
+        document.querySelectorAll(".nav-group").forEach(g => {
+          g.classList.remove("open");
+          const t = g.querySelector(".nav-group-toggle");
+          if (t) t.setAttribute("aria-expanded", "false");
+        });
+        if (willOpen) {
+          group.classList.add("open");
+          toggle.setAttribute("aria-expanded", "true");
+        }
+      };
+    });
   }
 
   function updateOfficeForm(){
@@ -2107,9 +2255,13 @@
   $("exportGameTop").onclick = exportSave;
   $("importGameSetup").onclick = () => $("backupFile").click();
   $("backupFile").onchange = (e) => { importSaveFile(e.target.files?.[0]); e.target.value = ""; };
+  $("importTseSetup").onclick=importRosterClick;
+  $("tseCandidateFile").onchange=(e)=>{importTseCandidateCSV(e.target.files?.[0]);e.target.value="";};
   $("newGame").onclick = newGameConfirm;
   $("nextTurn").onclick = takeTurn;
+  setupNavGroups();
   document.querySelectorAll(".nav-item").forEach(b => b.onclick = () => navTo(b.dataset.view));
+  openNavGroupByView("overview");
 
   window.__game = {
     spendAction(id) {
@@ -2126,6 +2278,6 @@
     advanceApuracao, selectApuracaoArchive,
     appointAdvisor,legislativeAction,
     loadProfile,deleteProfile,exportSave,
-    cloudAction
+    cloudAction,importRosterClick,restartApuracaoWithRealNames
   };
 })();

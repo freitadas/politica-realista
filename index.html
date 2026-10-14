@@ -97,6 +97,9 @@
         </div>
 
         <input type="file" id="backupFile" accept=".json,application/json" class="hidden" aria-label="Arquivo de backup do jogo" />
+        <input type="file" id="tseCandidateFile" accept=".csv,text/csv" class="hidden" aria-label="Arquivo CSV de candidaturas do TSE" />
+        <button type="button" id="importTseSetup" class="btn btn-ghost">Importar candidatos reais (CSV TSE)</button>
+        <p class="setup-note">Vitória e Vila Velha (ES) já têm nomes históricos de 2024 incluídos. Para outras localidades ou cargos, importe o CSV oficial do TSE da UF correspondente. Os votos do jogo são fictícios.</p>
         <div id="setupSlotList" class="setup-slot-list"></div>
         <div class="setup-note">
           Cenário de história alternativa. Partidos e algumas personalidades são reais, mas pesquisas, ações dos oponentes, resultados, processos e eventos são inventados. Regras de campanha, elegibilidade e distribuição de cadeiras são aproximações didáticas.
@@ -114,21 +117,65 @@
           </div>
         </div>
 
-        <nav id="nav">
-          <button class="nav-item active" data-view="overview">Visão geral</button>
-          <button class="nav-item" data-view="regions">Regiões</button>
-          <button class="nav-item" data-view="agenda">Agenda</button>
-          <button class="nav-item" data-view="proposals">Propostas</button>
-          <button class="nav-item" data-view="media">Mídia</button>
-          <button class="nav-item" data-view="coalitions">Alianças</button>
-          <button class="nav-item" data-view="integrity">Integridade</button>
-          <button class="nav-item" data-view="government">Mandato</button>
-          <button class="nav-item" data-view="debate">Debate ao vivo</button>
-          <button class="nav-item" data-view="apuracao">Apuração eleitoral</button>
-          <button class="nav-item" data-view="career">Carreira</button>
-          <button class="nav-item" data-view="electorate">Eleitorado</button>
-          <button class="nav-item" data-view="cabinet">Gabinete e Congresso</button>
-          <button class="nav-item" data-view="saves">Salvamentos</button>
+        <nav id="nav" class="nav-groups">
+          <div class="nav-group open" data-group="campanha">
+            <button class="nav-group-toggle" data-group-toggle="campanha" aria-expanded="true">
+              <span>Campanha</span>
+              <span class="nav-caret">▾</span>
+            </button>
+            <div class="nav-sublist">
+              <button class="nav-item active" data-view="overview">Visão geral</button>
+              <button class="nav-item" data-view="regions">Regiões</button>
+              <button class="nav-item" data-view="agenda">Agenda</button>
+              <button class="nav-item" data-view="proposals">Propostas</button>
+              <button class="nav-item" data-view="media">Mídia</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-group="partido">
+            <button class="nav-group-toggle" data-group-toggle="partido" aria-expanded="false">
+              <span>Partido</span>
+              <span class="nav-caret">▾</span>
+            </button>
+            <div class="nav-sublist">
+              <button class="nav-item" data-view="coalitions">Alianças</button>
+              <button class="nav-item" data-view="integrity">Integridade</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-group="eleicao">
+            <button class="nav-group-toggle" data-group-toggle="eleicao" aria-expanded="false">
+              <span>Eleição</span>
+              <span class="nav-caret">▾</span>
+            </button>
+            <div class="nav-sublist">
+              <button class="nav-item" data-view="debate">Debate ao vivo</button>
+              <button class="nav-item" data-view="apuracao">Apuração eleitoral</button>
+              <button class="nav-item" data-view="electorate">Eleitorado</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-group="mandato">
+            <button class="nav-group-toggle" data-group-toggle="mandato" aria-expanded="false">
+              <span>Mandato</span>
+              <span class="nav-caret">▾</span>
+            </button>
+            <div class="nav-sublist">
+              <button class="nav-item" data-view="government">Governo</button>
+              <button class="nav-item" data-view="cabinet">Gabinete e Congresso</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-group="carreira">
+            <button class="nav-group-toggle" data-group-toggle="carreira" aria-expanded="false">
+              <span>Carreira</span>
+              <span class="nav-caret">▾</span>
+            </button>
+            <div class="nav-sublist">
+              <button class="nav-item" data-view="career">Carreira política</button>
+              <button class="nav-item" data-view="saves">Salvamentos</button>
+            </div>
+          </div>
         </nav>
 
         <div class="sidebar-bottom">
@@ -334,6 +381,7 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
+  <script src="./real_candidates.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
