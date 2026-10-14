@@ -1344,6 +1344,8 @@
     $("nextTurn").textContent=state.phase==="counting"?(state.apuracao?.hourIndex===7?"Concluir apuração":`Avançar para ${APURACAO_HOURS[(state.apuracao?.hourIndex||0)+1]}`):state.phase==="ended"?"Disputar outra eleição":(state.debateAvailable||state.pendingDebate)?"Participar do debate":state.phase==="government"?"Avançar um mês":state.phase==="runoff"?"Avançar segundo turno":"Avançar uma semana";
     writeSave(false);
     renderSaveSlots();
+    renderInterfaceContext();
+    applyRegionFilter();
   }
 
   function renderPolls(nat) {
@@ -2213,6 +2215,69 @@
       electorate:"Eleitorado",cabinet:"Gabinete e Congresso",saves:"Salvamentos"
     };
     $("pageTitle").textContent = labels[view];
+    syncMobileTabs(view);
+    closeSidebar();
+    if (view === "regions") applyRegionFilter();
+    if (window.innerWidth <= 800) window.scrollTo({top:0,behavior:"instant"});
+  }
+
+  // Navigation UI is transient: saved games are not modified by opening menus.
+  function closeSidebar() {
+    $("game").classList.remove("drawer-open");
+    $("sidebarBackdrop").classList.add("hidden");
+    $("menuToggle").setAttribute("aria-expanded", "false");
+    document.body.classList.remove("drawer-lock");
+  }
+  function toggleSidebar() {
+    const opening = !$("game").classList.contains("drawer-open");
+    $("game").classList.toggle("drawer-open", opening);
+    $("sidebarBackdrop").classList.toggle("hidden", !opening);
+    $("menuToggle").setAttribute("aria-expanded", String(opening));
+    document.body.classList.toggle("drawer-lock", opening);
+    if (opening) $("game").querySelector(".nav-group-toggle")?.focus();
+  }
+  function syncMobileTabs(view) {
+    document.querySelectorAll("#mobileBottomNav [data-quick-view]").forEach(b => b.classList.toggle("active", b.dataset.quickView === view));
+  }
+  function applyRegionFilter() {
+    const input=$("regionFilter");
+    if(!input) return;
+    const term=input.value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR");
+    let matches=0;
+    $("regionGrid").querySelectorAll(".region-card").forEach(card=>{
+      const content=card.textContent.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR");
+      const visible=content.includes(term);
+      card.classList.toggle("hidden",!visible);
+      if(visible)matches++;
+    });
+    $("regionMatchCount").textContent=`${matches} ${matches===1?"região":"regiões"}`;
+    $("regionNoResults").classList.toggle("hidden",matches!==0);
+  }
+  function renderInterfaceContext(){
+    if(!state)return;
+    const phase=state.phase;
+    const labels={campaign:"Campanha eleitoral",runoff:"Segundo turno",counting:"Apuração em andamento",government:"Exercício do mandato",ended:"Carreira política"};
+    const stage=labels[phase]||"Carreira política";
+    $("sidebarStage").textContent=stage;
+    $("sidebarDistrict").textContent=`${officeNames[state.office]||"Cargo"} · ${state.district||"Brasil"}`;
+    $("candidatePhase").textContent=stage;
+    $("regionFilter").placeholder = state.regions.length === 27 ? "Buscar entre os estados…" : "Buscar região ou tema…";
+    $("weekMetaLabel").textContent=phase==="government"?"Mês":phase==="counting"?"Etapa":"Semana";
+    const titles={campaign:"Planeje sua próxima semana",runoff:"Prepare a decisão final",counting:"Acompanhe a contagem",government:"Administre o próximo mês",ended:"Sua carreira continua"};
+    const desc={campaign:"Escolha suas ações na agenda antes de avançar a campanha.",runoff:"Organize sua estratégia para o segundo turno.",counting:"Acompanhe os boletins eleitorais e avance a apuração hora a hora.",government:"Tome decisões de governo e acompanhe seus indicadores.",ended:"Use a aba Carreira para iniciar outra candidatura."};
+    $("nextTurnHeadline").textContent=(state.debateAvailable||state.pendingDebate)?"Um debate espera por você":titles[phase]||titles.campaign;
+    $("nextTurnDescription").textContent=(state.debateAvailable||state.pendingDebate)?"Responda às perguntas e participe das réplicas antes de seguir.":desc[phase]||desc.campaign;
+    const links={campaign:[["agenda","Planejar agenda"],["regions","Ver regiões"],["career","Minha carreira"]],runoff:[["agenda","Planejar agenda"],["debate","Ver debate"],["career","Minha carreira"]],counting:[["apuracao","Abrir apuração"],["career","Minha carreira"],["saves","Salvar resultado"]],government:[["government","Governar"],["cabinet","Gabinete e Congresso"],["career","Minha carreira"]],ended:[["career","Próxima candidatura"],["saves","Minhas carreiras"],["overview","Visão geral"]]};
+    const qs=$("quickAccess").querySelectorAll(".quick-link");
+    (links[phase]||links.campaign).forEach(([view,label],i)=>{if(qs[i]){qs[i].dataset.quickView=view;qs[i].querySelector(".quick-link-label").textContent=label;}});
+    const mobileAgenda = $("mobileBottomNav").querySelector(".mobile-tab:nth-child(2)");
+    const mobileElection = $("mobileBottomNav").querySelector(".mobile-tab:nth-child(3)");
+    const gov = phase === "government";
+    mobileAgenda.dataset.quickView = gov ? "cabinet" : "agenda";
+    mobileAgenda.lastElementChild.textContent = gov ? "Gestão" : "Agenda";
+    mobileElection.dataset.quickView = gov ? "government" : phase === "counting" ? "apuracao" : phase === "ended" ? "career" : "debate";
+    mobileElection.lastElementChild.textContent = gov ? "Mandato" : phase === "counting" ? "Apuração" : phase === "ended" ? "Carreira" : "Debate";
+    syncMobileTabs(document.querySelector(".nav-item.active")?.dataset.view || "overview");
   }
 
   function setupNavGroups() {
@@ -2298,6 +2363,7 @@
   $("saveGameTop").onclick = saveGame;
   $("exportGame").onclick = exportSave;
   $("exportGameTop").onclick = exportSave;
+  $("utilityMenu").addEventListener("click",e=>{if(e.target.closest(".utility-action"))$("utilityMenu").open=false;});
   $("importGameSetup").onclick = () => $("backupFile").click();
   $("backupFile").onchange = (e) => { importSaveFile(e.target.files?.[0]); e.target.value = ""; };
   $("importTseSetup").onclick=importRosterClick;
@@ -2305,6 +2371,13 @@
   $("newGame").onclick = newGameConfirm;
   $("nextTurn").onclick = takeTurn;
   setupNavGroups();
+  $("menuToggle").onclick=toggleSidebar;
+  $("sidebarBackdrop").onclick=closeSidebar;
+  $("mobileMore").onclick=toggleSidebar;
+  $("regionFilter").addEventListener("input",applyRegionFilter);
+  document.querySelectorAll("[data-quick-view]").forEach(b=>b.onclick=()=>navTo(b.dataset.quickView));
+  document.addEventListener("keydown",event=>{if(event.key==="Escape"){closeSidebar();$("utilityMenu").open=false;}});
+  window.addEventListener("resize",()=>{if(window.innerWidth>800)closeSidebar();});
   document.querySelectorAll(".nav-item").forEach(b => b.onclick = () => navTo(b.dataset.view));
   openNavGroupByView("overview");
 

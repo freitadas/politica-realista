@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101624" />
   <meta name="description" content="Simulador de eleições brasileiras em cenário fictício com carreira, debates e gestão pública." />
-  <title>Mandato v12 — Simulador Político</title>
+  <title>Mandato v13 — Simulador Político</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -17,7 +17,7 @@
             <div class="brand-mark">M</div>
             <div>
               <p class="eyebrow">SIMULADOR POLÍTICO</p>
-              <h1>Mandato <span class="v9-tag">v12</span></h1>
+              <h1>Mandato <span class="v9-tag">v13</span></h1>
             </div>
           </div>
           <span class="setup-edition">BRASIL ALTERNATIVO</span>
@@ -153,10 +153,11 @@
           <div class="brand-mark">M</div>
           <div>
             <strong>Mandato</strong>
-            <span>Carreira política</span>
+            <span>Simulador político · v13</span>
           </div>
         </div>
-
+        <div class="sidebar-context" aria-live="polite"><span class="sidebar-dot"></span><div><strong id="sidebarStage">Campanha eleitoral</strong><small id="sidebarDistrict">Sua jornada política</small></div></div>
+        <div class="nav-caption">EXPLORAR</div>
         <nav id="nav" class="nav-groups">
           <div class="nav-group open" data-group="campanha">
             <button class="nav-group-toggle" data-group-toggle="campanha" aria-expanded="true">
@@ -219,30 +220,45 @@
         </nav>
 
         <div class="sidebar-bottom">
-          <button id="saveGame" class="btn btn-ghost full">Salvar jogo</button>
-          <button id="exportGame" class="btn btn-ghost full">Baixar backup</button>
-          <button id="newGame" class="btn btn-danger full">Nova campanha</button>
+          <div class="sidebar-save-marker"><span class="status-saved-dot"></span> Salvamento automático</div>
+          <details class="sidebar-options" id="sidebarOptions">
+            <summary>Opções da carreira <span aria-hidden="true">⌄</span></summary>
+            <div class="sidebar-options-content">
+              <button id="saveGame" class="btn btn-ghost full">Salvar agora</button>
+              <button id="exportGame" class="btn btn-ghost full">Baixar backup</button>
+              <button id="newGame" class="btn btn-danger full">Nova campanha</button>
+            </div>
+          </details>
         </div>
       </aside>
 
       <main class="main">
         <header class="topbar">
-          <div>
-            <p class="eyebrow" id="campaignPhase">CAMPANHA NACIONAL</p>
-            <h2 id="pageTitle">Visão geral</h2>
+          <div class="topbar-leading">
+            <button id="menuToggle" type="button" class="icon-button mobile-menu-trigger" aria-label="Abrir navegação" aria-expanded="false" aria-controls="sidebarDrawer"><span aria-hidden="true">☰</span></button>
+            <div class="topbar-heading">
+              <p class="eyebrow" id="campaignPhase">CAMPANHA NACIONAL</p>
+              <h2 id="pageTitle">Visão geral</h2>
+            </div>
           </div>
           <div class="top-meta">
-            <button id="saveGameTop" class="btn btn-ghost">Salvar</button>
-            <button id="showSavesTop" class="btn btn-ghost">Carreiras</button>
-            <button id="exportGameTop" class="btn btn-ghost">Backup</button>
-            <div class="meta-box">
-              <span>Semana</span>
+            <div class="meta-box" id="weekMeta">
+              <span id="weekMetaLabel">Semana</span>
               <strong id="weekDisplay">24</strong>
             </div>
-            <div class="meta-box">
+            <div class="meta-box" id="energyMeta">
               <span>Ações</span>
               <strong id="energyDisplay">3/3</strong>
             </div>
+            <details id="utilityMenu" class="utility-menu">
+              <summary class="utility-trigger" aria-label="Opções do jogo" title="Opções do jogo"><span aria-hidden="true">⋯</span></summary>
+              <div class="utility-popup">
+                <p class="eyebrow">GERENCIAR PARTIDA</p>
+                <button id="saveGameTop" class="utility-action" type="button">Salvar agora</button>
+                <button id="showSavesTop" class="utility-action" type="button">Minhas carreiras</button>
+                <button id="exportGameTop" class="utility-action" type="button">Baixar backup JSON</button>
+              </div>
+            </details>
           </div>
         </header>
 
@@ -250,15 +266,29 @@
           <p id="saveStatus" class="save-status" aria-live="polite">Salvamento automático ativo</p>
           <section id="overviewView" class="view active">
             <div class="hero-card">
-              <div>
-                <p class="eyebrow">CANDIDATURA</p>
-                <h3 id="candidateTitle"></h3>
-                <p id="candidateSubtitle"></p>
+              <div class="candidate-block">
+                <p class="eyebrow">SUA CARREIRA POLÍTICA</p>
+                <div class="candidate-heading"><div class="candidate-avatar" aria-hidden="true">M</div><div><h3 id="candidateTitle"></h3><p id="candidateSubtitle"></p></div></div>
+                <div class="candidate-phase" id="candidatePhase">Campanha em andamento</div>
               </div>
               <div class="hero-poll">
                 <span id="pollLabel">Intenção de voto simulada</span>
                 <strong id="nationalPoll">0%</strong>
               </div>
+            </div>
+
+            <div class="action-band">
+              <div class="action-band-copy">
+                <p class="eyebrow">PRÓXIMO PASSO</p>
+                <h3 id="nextTurnHeadline">Organize sua campanha</h3>
+                <p id="nextTurnDescription">Execute ações e avance o calendário eleitoral quando estiver pronto.</p>
+              </div>
+              <button id="nextTurn" class="btn btn-primary">Avançar uma semana <span aria-hidden="true">→</span></button>
+            </div>
+            <div class="quick-access" id="quickAccess" aria-label="Atalhos do jogo">
+              <button class="quick-link" type="button" data-quick-view="agenda"><span class="quick-symbol" aria-hidden="true">▣</span><span class="quick-link-label">Planejar agenda</span><span aria-hidden="true">↗</span></button>
+              <button class="quick-link" type="button" data-quick-view="regions"><span class="quick-symbol" aria-hidden="true">◎</span><span class="quick-link-label">Ver regiões</span><span aria-hidden="true">↗</span></button>
+              <button class="quick-link" type="button" data-quick-view="career"><span class="quick-symbol" aria-hidden="true">◇</span><span class="quick-link-label">Minha carreira</span><span aria-hidden="true">↗</span></button>
             </div>
 
             <div class="metric-grid">
@@ -318,16 +348,14 @@
                 <div id="newsFeed" class="news-feed"></div>
               </div>
 
-              <div class="panel next-turn-panel">
-                <div>
-                  <p class="eyebrow">RODADA</p>
-                  <h3>Encerrar a semana</h3>
-                  <p>
-                    Ao avançar, pesquisas são atualizadas, os adversários agem e um novo
-                    evento político pode ocorrer.
-                  </p>
+              <div class="panel guide-panel">
+                <p class="eyebrow">CENTRAL DE COMANDO</p>
+                <h3>Decida o próximo movimento</h3>
+                <p>O resultado da sua carreira depende das decisões tomadas em cada etapa.</p>
+                <div class="guide-links">
+                  <button type="button" data-quick-view="proposals">Apresentar propostas <span aria-hidden="true">→</span></button>
+                  <button type="button" data-quick-view="media">Acompanhar a mídia <span aria-hidden="true">→</span></button>
                 </div>
-                <button id="nextTurn" class="btn btn-primary full">Avançar uma semana</button>
               </div>
             </div>
           </section>
@@ -353,7 +381,7 @@
               </div>
               <p>Explore os 26 estados e o Distrito Federal em um mapa clicável. Pesos eleitorais e cenários são gerados para o jogo, não são dados oficiais.</p>
             </div>
-            <div class="panel map-panel"><div class="panel-head"><div><p class="eyebrow">TERRITÓRIO SIMULADO</p><h3>Brasil por unidade federativa</h3></div><span class="badge" id="mapSource">Mapa esquemático</span></div><div id="brazilMap" class="brazil-map" aria-label="Mapa interativo dos estados brasileiros"></div><p class="map-caption">Clique em um estado para localizar o respectivo cartão. Fronteiras reais são carregadas quando a conexão permitir; os resultados e pesos são fictícios.</p></div><div id="regionGrid" class="region-grid"></div>
+            <div class="panel map-panel"><div class="panel-head"><div><p class="eyebrow">TERRITÓRIO SIMULADO</p><h3>Brasil por unidade federativa</h3></div><span class="badge" id="mapSource">Mapa esquemático</span></div><div id="brazilMap" class="brazil-map" aria-label="Mapa interativo dos estados brasileiros"></div><p class="map-caption">Clique em um estado para localizar o respectivo cartão. Fronteiras reais são carregadas quando a conexão permitir; os resultados e pesos são fictícios.</p></div><div class="filter-row"><label for="regionFilter">Localizar estado ou tema</label><input id="regionFilter" type="search" placeholder="Buscar entre as 27 unidades federativas…" autocomplete="off" /><span id="regionMatchCount" class="filter-count">27 regiões</span></div><p id="regionNoResults" class="empty-filter hidden">Nenhuma região corresponde à busca.</p><div id="regionGrid" class="region-grid"></div>
           </section>
 
           <section id="agendaView" class="view">
@@ -407,6 +435,15 @@
         </div>
       </main>
     </section>
+
+    <button id="sidebarBackdrop" class="sidebar-backdrop hidden" type="button" tabindex="-1" aria-label="Fechar navegação"></button>
+    <nav id="mobileBottomNav" class="mobile-bottom-nav" aria-label="Navegação rápida">
+      <button class="mobile-tab active" type="button" data-quick-view="overview"><span class="mobile-tab-icon" aria-hidden="true">⌂</span><span>Início</span></button>
+      <button class="mobile-tab" type="button" data-quick-view="agenda"><span class="mobile-tab-icon" aria-hidden="true">▦</span><span>Agenda</span></button>
+      <button class="mobile-tab" type="button" data-quick-view="apuracao"><span class="mobile-tab-icon" aria-hidden="true">◷</span><span>Eleição</span></button>
+      <button class="mobile-tab" type="button" data-quick-view="career"><span class="mobile-tab-icon" aria-hidden="true">◇</span><span>Carreira</span></button>
+      <button class="mobile-tab" type="button" id="mobileMore"><span class="mobile-tab-icon" aria-hidden="true">☷</span><span>Menu</span></button>
+    </nav>
 
     <div id="modalBackdrop" class="modal-backdrop hidden">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
